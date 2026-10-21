@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# B3 (v2.3): 可执行入口 — 不再拼 `python3 ~/review-board/boardctl.py`; install.sh 软链到 ~/.local/bin
+# 解 symlink (macOS readlink 无 -f): 软链在 ~/.local/bin 时 dirname 不是仓库
+SRC="${BASH_SOURCE[0]}"
+while [ -L "$SRC" ]; do
+  DIR="$(cd "$(dirname "$SRC")" && pwd)"
+  SRC="$(readlink "$SRC")"
+  [[ "$SRC" != /* ]] && SRC="$DIR/$SRC"
+done
+exec python3 "$(cd "$(dirname "$SRC")/.." && pwd)/boardctl.py" "$@"

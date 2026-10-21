@@ -1,0 +1,12 @@
+[Unit]
+Description=review-board 文档评审板 (loopback-only :8798)
+
+[Service]
+ExecStart=/usr/bin/python3 __ROOT__/server.py
+Restart=always
+RestartSec=2
+StandardOutput=append:__ROOT__/logs/server.log
+StandardError=append:__ROOT__/logs/server.log
+
+[Install]
+WantedBy=default.target

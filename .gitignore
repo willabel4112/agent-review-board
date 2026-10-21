@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.DS_Store
+registry.json
+*.local.json
+*.local.json.*
+.snapshots/
+logs/
+*.comments.jsonl
+*.replies.jsonl
+.demo/

@@ -1,0 +1,93 @@
+# Usage
+
+## Button glossary
+
+| Interface label | Meaning |
+|---|---|
+| 立即发 / 发 | Send this comment or follow-up now |
+| 保存草稿 / 存 | Save a draft without delivering it |
+| 提交这批 | Review and submit the pending draft batch |
+| 看完了 | Mark the current document version as read |
+| 批准这版 | Accept the reviewed version when a round awaits acceptance |
+| 改动 / ●改 / +新 | Changes / modified block / added block |
+| 追问 | Follow-up question |
+| 解决 / 重开 | Resolve / reopen a thread |
+| 深入 / 探索 | Explore a question branch |
+| 返回原处 / 上一层 | Return to the original place / previous reading layer |
+| 值守 | The session currently waiting for this document |
+| 私有笔记 | Private note, excluded from submission |
+
+Select a passage to anchor a comment, or use the block comment control. Send one
+question immediately, or save several and submit them as a batch. A follow-up
+returns an answered thread to the agent's pending queue after delivery.
+
+## Agent loop
+
+```sh
+python3 boardctl.py pending --doc plan --json
+python3 boardctl.py wait --doc plan --timeout 300
+```
+
+`wait` exits with 0 when work is available, 1 on timeout, and 3 if another live
+session owns the claim. A running agent must consume that result; there is no
+background model service. `reply` and `answer-edit` require `--summary`.
+
+Write long answers under `<document>.answers/` and pass a document-relative path:
+
+```sh
+python3 boardctl.py reply plan c-0001 --summary "Why we changed the sample" \
+  --doc-ref plan.md.answers/sampling.md
+```
+
+For an independently reviewable answer, register a child document:
+
+```sh
+python3 boardctl.py register /absolute/path/sampling.md --id sampling \
+  --title "Sampling strategy" --parent plan --born-from c-0001
+```
+
+The tree shows the relation. The agent still decides which source passages and
+answers to read. The tree itself does not create a new model conversation.
+
+## Identity and configuration
+
+For an arbitrary agent harness, export a real session identifier and label:
+
+```sh
+export RB_AGENT_SESSION="your-native-session-id"
+export RB_AGENT_HARNESS="your-harness"
+export RB_AGENT_NAME="your-agent-label"
+```
+
+Without the explicit session override, native `CODEX_THREAD_ID` or
+`CLAUDE_CODE_SESSION_ID` is used if present. Otherwise the harness is unknown and
+no native session is claimed. No model is inferred from the harness name.
+
+`RB_DATA_DIR` chooses the local registry, snapshots and claim directory. Set it
+consistently for the server and CLI. `RB_PORT` defaults to 8798. `RB_HOST` changes
+the host display alias. The demo uses a separate temporary directory and prints
+the exact environment needed if you want an agent to answer its comments.
+
+## Storage and sharing
+
+The registered Markdown remains where it is. Human events append to
+`<document>.comments.jsonl`; agent events append to `<document>.replies.jsonl`.
+Those files can travel with the document repository, but contain review history
+and potentially private notes. Review them before committing or publishing.
+The source repository's `.gitignore` excludes runtime state and sidecars by default.
+
+Snapshots preserve old versions for display. Losing them loses historical views,
+not the canonical document. A registry is local to each installation.
+
+## Optional resident service
+
+After trying the foreground server, `./install.sh` runs the core tests and installs
+a per-user launchd service on macOS or systemd service on Linux. It also creates a
+`~/.local/bin/boardctl` symlink. This changes your service configuration; it is not
+required for the demo. The default service uses port 8798, so stop a foreground
+instance first. Custom port/data environment variables need to be configured in
+your service manager, not just the installation shell.
+
+For another machine, run an independent board there and use an SSH local forward.
+The optional `tunnel.sh` helper supports launchd on macOS. It does not copy
+documents or unify their write paths.

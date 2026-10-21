@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>review-board</title>
+<link rel="stylesheet" href="/static/style.css">
+<link id="fav" rel="icon" type="image/svg+xml" href="/favicon.svg">
+<script src="/static/marked.min.js"></script>
+<script src="/static/mermaid.min.js"></script>
+</head>
+<body class="viewer">
+<header id="topbar">
+ <div class="titlebar">
+  <a href="/" id="home" title="所有文档">⌂</a>
+  <span id="title"></span>
+  <span id="born" class="hint" hidden></span>
+  <span id="question" class="hint" hidden></span>
+  <span id="archchip" class="hint" hidden>🗄 已归档</span>
+  <span id="draftdocchip" class="chip s-draft" hidden>✏️ 草稿</span>
+  <span id="claimchip" class="claim none" hidden></span>
+ </div>
+ <div class="toolbar">
+  <button id="tocToggle" class="ghost" aria-expanded="true" aria-controls="outline" title="探索分支与本文目录">☰ 导航</button>
+  <button id="seenBtn" class="ghost" title="看完了">看完了</button>
+  <button id="submitBtn" disabled>提交这批</button>
+  <span id="covchip" class="cov" hidden></span>
+  <span id="views" hidden>
+    <button id="viewDoc" class="seg on">文档</button><button id="viewDiff" class="seg">改动</button>
+  </span>
+  <span id="counts"></span>
+  <span id="draftchip" hidden></span>
+  <button id="searchBtn" class="ghost" title="搜本文档 (含折叠卡与外链答案 — ⌘F 搜不到的)">🔍</button>
+  <button id="noteBtn" class="ghost" title="私有笔记 — agent 永远看不见, 不进提交清单">📝</button>
+  <button id="metaBtn" class="ghost" title="改 emoji / 画框颜色">⚙</button>
+  <button id="sideToggle" class="ghost" title="隐藏/显示评论栏">◫</button>
+ </div>
+</header>
+<div id="roundbar" hidden></div>
+<div id="searchbar" hidden><input id="sq" placeholder="搜本文档… (≥2 字; 含折叠评论与外链答案)"><div id="sres"></div></div>
+<div id="metaedit" hidden>
+  <label>emoji <input id="me_emoji" maxlength="4" placeholder="🧭"></label>
+  <label>画框 <input id="me_color" type="color"></label>
+  <button id="me_save">存</button>
+</div>
+<main>
+  <nav id="outline" aria-label="文档目录">
+    <section id="exploreMap" aria-label="探索路径">
+      <div class="outline-head"><strong>探索</strong><button id="exploreAsk" class="ghost tiny" title="围绕本文提出一个新的探索问题">＋ 提问</button></div>
+      <div id="exploreTree"></div>
+      <p id="exploreHint">从一句不懂的话开始，分支会留在这里。</p>
+    </section>
+    <div class="outline-head"><strong>目录</strong><button id="expandSections" class="ghost tiny">展开正文</button></div>
+    <div id="toc"></div>
+  </nav>
+  <article id="doc"></article>
+  <div id="sideDrag" title="拖动调宽 · 双击复位"></div>
+  <aside id="side">
+    <div id="stage" hidden></div>
+    <div id="tray" hidden>
+      <h3>⚠ 未锚定 <span class="hint">(评论时的那块在新版里找不到 — 别猜, 展开确认)</span></h3>
+      <div id="traylist"></div>
+    </div>
+    <div id="chips">
+      <button class="fchip" data-f="todo">未解决</button><button class="fchip" data-f="drafts">未提交</button><button class="fchip" data-f="followups">追问</button><button class="fchip" data-f="all">全部</button><button class="fchip" data-f="resolved">已解决</button>
+    </div>
+    <div id="docthreads"></div>
+    <div id="threads"></div>
+  </aside>
+</main>
+<div id="composer" hidden>
+  <div id="cquote"></div>
+  <textarea id="ctext" placeholder="评论… (⌘Enter 保存草稿)"></textarea>
+  <div class="crow">
+    <button id="csave">保存草稿</button>
+    <button id="csend" class="ghost">立即发</button>
+    <button id="cexplore" class="ghost">作为探索发出</button>
+    <button id="ccancel" class="ghost">取消</button>
+  </div>
+</div>
+<div id="selectionActions" hidden><button id="selbtn">💬 评论</button><button id="exploreSelBtn">↗ 深入</button></div>
+<div id="toast" hidden></div>
+<div id="exploreShade" hidden></div>
+<section id="exploreDrawer" role="dialog" aria-modal="true" aria-label="探索阅读区" hidden>
+  <div class="explore-controls">
+    <button id="exploreBack" class="ghost">← 返回原处</button>
+    <nav id="exploreTrail" aria-label="当前探索路径"></nav>
+    <a id="exploreExternal" target="_blank" rel="noopener" title="在独立标签页打开">↗ 单独打开</a>
+    <button id="exploreClose" class="ghost" aria-label="收起探索，返回原文">×</button>
+  </div>
+  <div id="exploreFrames"></div>
+</section>
+<script src="/static/navigation.js"></script>
+<script src="/static/explore.js"></script>
+<script src="/static/app.js"></script>
+</body>
+</html>
