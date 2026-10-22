@@ -1,5 +1,13 @@
 # Release notes
 
+## 0.1.1 — English interface
+
+- Translate the document viewer, home page, exploration reader, tooltips,
+  accessibility labels, CLI help and server messages into English.
+- Allow sidebar filters to wrap and widen thread labels for longer English text.
+- Replace the README and blog screenshots with the English synthetic demo.
+- Keep stored event fields, document content and review behavior unchanged.
+
 ## 0.1.0 — first public release
 
 Derived from the working v2.7 feature set: anchored threads and follow-ups,

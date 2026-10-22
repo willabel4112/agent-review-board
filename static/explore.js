@@ -5,7 +5,7 @@ window.RBExplore = (() => {
   const embedded = new URLSearchParams(location.search).get("embedded") === "1" && window.parent !== window;
   let opts, family, signature = "", lastFetch = 0, fetching = null, paused = false, returnFocus = null, returnScroll = null;
   const frames = new Map(), trail = [], folds = new Map();
-  const labels = { open: "待答", answered: "已答", resolved: "已解决" };
+  const labels = { open: "Pending", answered: "Answered", resolved: "Resolved" };
 
   function safeURL(value) {
     try {
@@ -19,7 +19,7 @@ window.RBExplore = (() => {
     window.parent.postMessage({ channel: "rb-explore", action, ...payload }, location.origin);
   }
   function openThread(doc, cid, title) {
-    openURL(`/d/${encodeURIComponent(doc)}?thread=${encodeURIComponent(cid)}`, title || "探索分支");
+    openURL(`/d/${encodeURIComponent(doc)}?thread=${encodeURIComponent(cid)}`, title || "Question branch");
   }
   function openURL(value, title) {
     const href = safeURL(value);
@@ -39,10 +39,10 @@ window.RBExplore = (() => {
     }
     const previous = trail.findIndex(item => item.href === href);
     if (previous >= 0) trail.splice(previous + 1);
-    else trail.push({ href, title: title || "深入阅读" });
+    else trail.push({ href, title: title || "Explore further" });
     if (!frames.has(href)) {
       const frame = document.createElement("iframe");
-      frame.className = "explore-frame"; frame.title = title || "探索内容";
+      frame.className = "explore-frame"; frame.title = title || "Exploration content";
       const src = new URL(href, location.origin); src.searchParams.set("embedded", "1");
       frame.src = src.href;
       frame.onload = () => updateFrames();
@@ -75,10 +75,10 @@ window.RBExplore = (() => {
     for (const el of [$("topbar"), document.querySelector("main"), $("roundbar")]) if (el) el.inert = !!active;
     updateFrames();
     if (!active) return;
-    $("exploreBack").textContent = trail.length > 1 ? "← 上一层" : "← 返回原处";
+    $("exploreBack").textContent = trail.length > 1 ? "← Back one level" : "← Back to source";
     $("exploreExternal").href = active.href;
     const crumbs = $("exploreTrail"); crumbs.replaceChildren();
-    const root = document.createElement("button"); root.textContent = "原文"; root.onclick = close; crumbs.appendChild(root);
+    const root = document.createElement("button"); root.textContent = "Source"; root.onclick = close; crumbs.appendChild(root);
     trail.forEach((item, i) => {
       const button = document.createElement("button"); button.textContent = item.title; button.title = item.title;
       if (i === trail.length - 1) button.setAttribute("aria-current", "page");
@@ -99,7 +99,7 @@ window.RBExplore = (() => {
       const sync = () => {
         sub.hidden = folds.get(node.key) === true;
         toggle.textContent = sub.hidden ? "▸" : "▾";
-        toggle.setAttribute("aria-label", `${sub.hidden ? "展开" : "收起"}分支 ${node.title}`);
+        toggle.setAttribute("aria-label", `${sub.hidden ? "Expand" : "Collapse"} branch ${node.title}`);
         toggle.setAttribute("aria-expanded", String(!sub.hidden));
       };
       toggle.onclick = () => { folds.set(node.key, !sub.hidden); sync(); }; sync(); row.appendChild(toggle);
@@ -113,7 +113,7 @@ window.RBExplore = (() => {
     const title = document.createElement("span"); title.className = "explore-name";
     title.textContent = `${node.icon || "↗"} ${node.title}`;
     const status = document.createElement("small"); status.className = "explore-status";
-    status.textContent = node.exists === false ? "文件不在本机" : node.archived ? "已归档" : node.status || "文档";
+    status.textContent = node.exists === false ? "File not on this machine" : node.archived ? "Archived" : node.status || "Document";
     button.append(title, status); button.onclick = () => openURL(node.href, node.title);
     row.appendChild(button); wrap.append(row, sub);
     for (const child of descendants) sub.appendChild(treeNode(child, children, path));
@@ -151,10 +151,10 @@ window.RBExplore = (() => {
     fetching = (async () => {
       try {
         const response = await fetch(`/api/explore/${encodeURIComponent(opts.docid)}`);
-        if (!response.ok) throw new Error("探索树暂时不可用");
+        if (!response.ok) throw new Error("Exploration tree unavailable");
         const data = await response.json();
         if (Array.isArray(data.docs) && Array.isArray(data.branches)) renderTree(data);
-      } catch (_) { if (!family) $("exploreHint").textContent = "探索树暂时不可用，稍后重试"; }
+      } catch (_) { if (!family) $("exploreHint").textContent = "Exploration tree unavailable; try again shortly"; }
       finally { fetching = null; }
     })();
     return fetching;
@@ -166,7 +166,7 @@ window.RBExplore = (() => {
     opts.refreshThreads();
   }
   function source(cid) {
-    openURL(`/d/${encodeURIComponent(opts.docid)}#${cid}`, "返回问题出处");
+    openURL(`/d/${encodeURIComponent(opts.docid)}#${cid}`, "Back to the source question");
   }
   function init(options) {
     opts = options;
@@ -183,7 +183,7 @@ window.RBExplore = (() => {
       if (!a || a.id === "exploreExternal" || a.hasAttribute("download")) return;
       const href = safeURL(a.href);
       if (!href || a.getAttribute("href").startsWith("#")) return;
-      e.preventDefault(); openURL(href, a.textContent.trim() || "深入阅读");
+      e.preventDefault(); openURL(href, a.textContent.trim() || "Explore further");
     });
     window.addEventListener("message", e => {
       if (e.origin !== location.origin || e.data?.channel !== "rb-explore") return;
@@ -192,7 +192,7 @@ window.RBExplore = (() => {
         return;
       }
       if (![...frames.values()].some(frame => frame.contentWindow === e.source)) return;
-      if (e.data.action === "open") openURL(e.data.href, String(e.data.title || "深入阅读").slice(0, 160));
+      if (e.data.action === "open") openURL(e.data.href, String(e.data.title || "Explore further").slice(0, 160));
       if (e.data.action === "changed") { refresh(true); opts.refreshThreads(); }
     });
     refresh(true);

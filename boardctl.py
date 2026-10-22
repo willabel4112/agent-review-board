@@ -35,7 +35,7 @@ def cmd_register(a):
         entry["parent"] = a.parent
     if a.born_from:
         if not a.parent:
-            sys.exit("--born-from 需要一并给 --parent (出身 = 母文档的某条评论)")
+            sys.exit("--born-from requires --parent (the comment belongs to the parent document)")
         entry["born"] = {"doc": a.parent, "cid": a.born_from}
     if a.question:
         # v2.1 question-first: 孕育本文档的原始问题, 别让它死在 chat 里
@@ -60,7 +60,7 @@ def cmd_archive(a):
         n_open = sum(1 for t in lib.fold_threads(reg[a.doc]["path"])[0]
                      if t["status"] == "open")
         if n_open:
-            print("⚠ 还有 %d 条待答 — 照封, 但它们从此不进 pending" % n_open)
+            print("⚠ %d unanswered comments remain; archiving excludes them from pending" % n_open)
         reg[a.doc]["archived"] = True
         print("archived %s" % a.doc)
     else:
@@ -79,7 +79,7 @@ def cmd_graduate(a):
     if th is None:
         sys.exit("unknown comment id: %s" % a.cid)
     if th["status"] not in ("answered", "resolved"):
-        sys.exit("comment %s is %s — 裁决还不存在, 没得毕业 (先答)" % (a.cid, th["status"]))
+        sys.exit("comment %s is %s — answer it before recording a decision destination" % (a.cid, th["status"]))
     _, rpath = lib.sidecar_paths(reg[a.doc]["path"])
     lib.append_event(rpath, {"type": "graduate", "re": a.cid, "ts": lib.now_ts(),
                              "dest": a.dest.strip(), "note": (a.note or "").strip() or None,
@@ -101,13 +101,13 @@ def cmd_draft(a):
 
 
 def cmd_emoji(a):
-    """v2.4 F12: 设置/改文档 emoji (favicon 身份)."""
+    """v2.4 F12: Set the document emoji and favicon."""
     reg = lib.load_registry()
     if a.doc not in reg:
         sys.exit("unknown doc: %s" % a.doc)
     used = {m.get("emoji"): d for d, m in reg.items() if m.get("emoji") and d != a.doc}
     if a.emoji in used:
-        print("⚠ %s 已被 %s 用 — 照设 (画框/母子组合兜底), 但建议换" % (a.emoji, used[a.emoji]))
+        print("⚠ %s is already used by %s; assigned anyway, but a distinct emoji is recommended" % (a.emoji, used[a.emoji]))
     reg[a.doc]["emoji"] = a.emoji
     lib.save_registry(reg)
     print("emoji %s = %s" % (a.doc, a.emoji))
@@ -120,7 +120,7 @@ def cmd_move(a):
         sys.exit("unknown doc: %s" % a.doc)
     new = os.path.realpath(a.newpath)
     if not os.path.isfile(new):
-        sys.exit("目标文件不存在 (先把 md 移过去 / git mv): %s" % new)
+        sys.exit("Target file missing (move the Markdown file first): %s" % new)
     import shutil
     old = reg[a.doc]["path"]
     moved = []
@@ -130,7 +130,7 @@ def cmd_move(a):
             moved.append(os.path.basename(newsc))
     reg[a.doc]["path"] = new
     lib.save_registry(reg)
-    print("moved %s -> %s (sidecars: %s)" % (a.doc, new, ", ".join(moved) or "无"))
+    print("moved %s -> %s (sidecars: %s)" % (a.doc, new, ", ".join(moved) or "none"))
 
 
 def cmd_list(a):
@@ -146,15 +146,15 @@ def _fmt(items):
     for it in items:
         anchor = it.get("anchor") or {}
         sel = anchor.get("sel") or {}
-        where = anchor.get("slug") or ("打回第 %s 回合" % it.get("re_batch")
-                                       if it.get("kind") == "reject" else "整篇")
+        where = anchor.get("slug") or ("Changes requested for round %s" % it.get("re_batch")
+                                       if it.get("kind") == "reject" else "Whole document")
         print("== %s %s [batch %s] @%s" % (it["doc"], it["id"],
                                            it.get("batch"), where))
         if it.get("intent") == "explore":
-            print("   [探索分支] 围绕这一问作答；需要独立正文时 register --parent %s --born-from %s" % (it["doc"], it["id"]))
+            print("   [explore] Answer this question; for a child document, register --parent %s --born-from %s" % (it["doc"], it["id"]))
         # 划词锚给 sel.text (更准的上下文), 没有才退回块 quote
         if sel.get("text"):
-            print("   >划词> %s" % sel["text"][:100])
+            print("   >selection> %s" % sel["text"][:100])
         elif anchor.get("quote"):
             print("   > %s" % anchor["quote"][:100])
         for ln in it["text"].splitlines():
@@ -162,7 +162,7 @@ def _fmt(items):
         # v2: thread 有多轮时打印最近 ≤3 轮 (根 comment 上面已印, 跳过)
         turns = [t for t in it.get("turns") or [] if t["kind"] != "comment"]
         for t in turns[-3:]:
-            who = "Reviewer 追问" if t["kind"] == "followup" else \
+            who = "Reviewer follow-up" if t["kind"] == "followup" else \
                   (t.get("author") or "agent") if t["kind"] == "reply" else \
                   "answer·%s" % t.get("mode")
             first = (t.get("text") or t.get("summary") or "").splitlines() or [""]
@@ -194,17 +194,17 @@ def _claim(docs, me, takeover):
     for d in docs:
         c = claims.get(d)
         if c and c.get("sid") != me["sid"] and lib.claim_alive(c, now):
-            who = "%s (%s@%s, %s, 心跳 %ds 前)" % (c.get("name"), (c.get("sid") or "")[:8],
+            who = "%s (%s@%s, %s, heartbeat %ds ago)" % (c.get("name"), (c.get("sid") or "")[:8],
                                                  c.get("host"), c.get("cwd"),
                                                  int(now - (c.get("beat") or 0)))
             if not takeover:
-                print("✗ %s 已由 %s 值守 — 要抢加 --takeover, 或 SendMessage 找它" % (d, who))
+                print("✗ %s is watched by %s; coordinate with that session, or explicitly use --takeover" % (d, who))
                 return 3
-            print("⚠ takeover: %s 从 %s 手里抢过来" % (d, who))
+            print("⚠ takeover: claiming %s from %s" % (d, who))
         claims[d] = {"sid": me["sid"], "name": me["name"], "host": me["host"],
                      "cwd": me["cwd"], "pid": me["pid"], "since": now, "beat": now}
     lib.save_claims(claims)
-    print("值守 %s ← %s (%s@%s)" % (",".join(docs), me["name"], me["sid"][:8], me["host"]))
+    print("Watching %s ← %s (%s@%s)" % (",".join(docs), me["name"], me["sid"][:8], me["host"]))
     return 0
 
 
@@ -228,7 +228,7 @@ def _release(docs, me):
 
 
 def _fmt_coverage(items):
-    """pending 尾巴: 每份有待答的文档一行覆盖率 — agent 别把没看当默许 (契约 v2.3)."""
+    """pending 尾巴: 每份有Pending的文档一行覆盖率 — agent 别把没看当默许 (契约 v2.3)."""
     reg = lib.load_registry()
     for docid in sorted({it["doc"] for it in items}):
         meta = reg.get(docid)
@@ -243,9 +243,9 @@ def _fmt_coverage(items):
             sl = (u.get("slug") or "").split("~")[0]     # 同节多块的 ~n 后缀去掉, 按节报
             if sl and sl not in heads:
                 heads.append(sl)
-        print("   覆盖 %s: 看过 %d/%d 块%s" % (
+        print("   Coverage %s: read %d/%d blocks%s" % (
             docid, cov["n_seen"], cov["n_total"],
-            (" · 未看: " + ", ".join(heads[:6]) + (" …" if len(heads) > 6 else "")) if heads else ""))
+            (" · Unread: " + ", ".join(heads[:6]) + (" …" if len(heads) > 6 else "")) if heads else ""))
 
 
 def cmd_wait(a):
@@ -264,7 +264,7 @@ def cmd_wait(a):
         if rc:
             return rc
     else:
-        print("⚠ 全局 wait 不认领 — 多 session 会被同一条评论一起吵醒, 建议 --doc 圈地")
+        print("⚠ Global wait does not claim documents; use --doc to avoid waking multiple sessions for the same comment")
     armed = False
     try:
         while time.time() < deadline:
@@ -285,14 +285,14 @@ def cmd_wait(a):
 
 
 def cmd_claims(a):
-    """谁在值守哪份文档 (机器本地)."""
+    """Show local document watchers."""
     claims = lib.load_claims()
     now = time.time()
     if not claims:
-        print("-- 无人值守任何文档")
+        print("-- No documents are being watched")
     for d, c in claims.items():
         alive = lib.claim_alive(c, now)
-        print("%-24s %s %s (%s@%s, %s) 心跳 %ds 前" % (
+        print("%-24s %s %s (%s@%s, %s) heartbeat %ds ago" % (
             d, "●" if alive else "○", c.get("name"), (c.get("sid") or "")[:8],
             c.get("host"), c.get("cwd"), int(now - (c.get("beat") or 0))))
 
@@ -307,7 +307,7 @@ def cmd_release(a):
             claims.pop(d)
             gone.append(d)
     lib.save_claims(claims)
-    print("released %s" % (", ".join(gone) or "无"))
+    print("released %s" % (", ".join(gone) or "none"))
 
 
 def cmd_unregister(a):
@@ -318,9 +318,9 @@ def cmd_unregister(a):
     p = reg[a.doc]["path"]
     if os.path.isfile(p):
         n = len(lib.fold_threads(p)[0])
-        print("⚠ 文件还在 (%d 条 thread) — 照摘; 评论史留在 sidecar 里" % n)
+        print("⚠ File still exists (%d threads); unregistered, review history remains in sidecars" % n)
     else:
-        print("文件不在本机: %s" % p)
+        print("File not on this machine: %s" % p)
     reg.pop(a.doc)
     lib.save_registry(reg)
     print("unregistered %s" % a.doc)
@@ -332,19 +332,19 @@ def _docref_rel(doc_path, ref):
     full = os.path.realpath(ref if os.path.isabs(ref)
                             else os.path.join(base, ref))
     if not os.path.isfile(full):
-        sys.exit("--doc-ref 文件不存在: %s" % full)
+        sys.exit("--doc-ref file does not exist: %s" % full)
     if full != base and not full.startswith(base + os.sep):
-        sys.exit("--doc-ref 必须在 doc 目录内 (server jail 会拒): %s" % full)
+        sys.exit("--doc-ref must stay inside the document directory: %s" % full)
     rel = os.path.relpath(full, base)
     conv = os.path.basename(doc_path) + ".answers" + os.sep
     if not rel.startswith(conv):
-        print("⚠ doc_ref 不在约定目录 <doc>.answers/ 下 (照写, 但约定防漂移): %s" % rel)
+        print("⚠ doc_ref is outside the conventional <doc>.answers/ directory; accepted: %s" % rel)
     return rel.replace(os.sep, "/")
 
 
 def _answer(doc, cid, text, summary, mode, commit=None, doc_ref=None):
     if not summary or not summary.strip():
-        sys.exit("--summary 一行外行结论是硬性验收 (PRD §3), 必填")
+        sys.exit("--summary is required: give a useful one-line conclusion")
     reg = lib.load_registry()
     if doc not in reg:
         sys.exit("unknown doc: %s" % doc)
@@ -353,7 +353,7 @@ def _answer(doc, cid, text, summary, mode, commit=None, doc_ref=None):
     if th is None:
         sys.exit("unknown comment id: %s" % cid)
     if th["status"] not in ("open", "answered"):
-        sys.exit("comment %s is %s — 409, 不写" % (cid, th["status"]))
+        sys.exit("comment %s is %s — 409, no event written" % (cid, th["status"]))
     if doc_ref:
         doc_ref = _docref_rel(reg[doc]["path"], doc_ref)
     _, rpath = lib.sidecar_paths(reg[doc]["path"])
@@ -416,8 +416,8 @@ def cmd_rounds(a):
         if docid not in reg:
             sys.exit("unknown doc: %s" % docid)
         for r in lib.fold_rounds(reg[docid]["path"]):
-            mark = {"open": "待答", "answered": "⏳ 等你批", "approved": "✓ 已批"}
-            print("%-14s 回合%-2s %-8s 评论%d 已答%d 改文档%d %s" % (
+            mark = {"open": "Pending", "answered": "⏳ Awaiting approval", "approved": "✓ Approved"}
+            print("%-14s round %-2s %-8s comments=%d answered=%d edits=%d %s" % (
                 docid, r["batch"], mark.get(r["status"], r["status"]),
                 len(r["ids"]), len(r["answered_ids"]), len(r["edited_ids"]),
                 ("· " + r["approve_note"]) if r["approve_note"] else ""))
@@ -428,109 +428,109 @@ def cmd_drafts(a):
     now = lib.now_ts()
     rows = lib.draft_counts()
     for r in rows:
-        print("%-14s %d 条未提交 (最早 %.1f 天前)" %
+        print("%-14s %d drafts (oldest %.1f days ago)" %
               (r["doc"], r["n"], (now - r["oldest_ts"]) / 86400))
     if not rows:
-        print("-- 无未提交草稿")
+        print("-- No unsent drafts")
 
 
 def main():
     ap = argparse.ArgumentParser(prog="boardctl")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
-    p = sub.add_parser("register", help="注册文档上板")
+    p = sub.add_parser("register", help="Register a Markdown document")
     p.add_argument("path")
     p.add_argument("--id")
     p.add_argument("--title")
-    p.add_argument("--parent", help="母文档 docid (板列表挂卫星)")
-    p.add_argument("--born-from", help="出身评论 c-id (卫星页头反链; 需 --parent)")
-    p.add_argument("--question", help="孕育本文档的原始问题 (question-first 出生记录)")
-    p.add_argument("--emoji", help="favicon 身份 emoji (v2.4; 起板必配, 避开已用)")
-    p.add_argument("--draft", action="store_true", help="草稿类文档 (上板但注明, v2.5 F18③)")
+    p.add_argument("--parent", help="Parent document ID (shows this as a child document)")
+    p.add_argument("--born-from", help="Origin comment ID (requires --parent)")
+    p.add_argument("--question", help="The original question this document answers")
+    p.add_argument("--emoji", help="Document emoji used in its favicon")
+    p.add_argument("--draft", action="store_true", help="Label this document as a draft")
     p.set_defaults(fn=cmd_register)
 
-    p = sub.add_parser("draft", help="草稿标记开关 (on|off)")
+    p = sub.add_parser("draft", help="Set the document draft label (on|off)")
     p.add_argument("doc")
     p.add_argument("state", nargs="?", default="on", choices=["on", "off"])
     p.set_defaults(fn=cmd_draft)
 
-    p = sub.add_parser("emoji", help="设置/改文档 emoji (favicon 身份)")
+    p = sub.add_parser("emoji", help="Set the document emoji and favicon")
     p.add_argument("doc")
     p.add_argument("emoji")
     p.set_defaults(fn=cmd_emoji)
 
-    p = sub.add_parser("archive", help="冷却封存 (可逆; wait/pending 不再看它)")
+    p = sub.add_parser("archive", help="Archive a document (reversible; excluded from wait/pending)")
     p.add_argument("doc")
     p.set_defaults(fn=cmd_archive)
 
-    p = sub.add_parser("unarchive", help="解封")
+    p = sub.add_parser("unarchive", help="Unarchive a document")
     p.add_argument("doc")
     p.set_defaults(fn=cmd_archive)
 
-    p = sub.add_parser("graduate", help="毕业指针: 裁决已写进项目文档后记反链")
+    p = sub.add_parser("graduate", help="Record where an answered decision was saved")
     p.add_argument("doc")
     p.add_argument("cid")
-    p.add_argument("--dest", required=True, help="裁决落点描述 (如 lifecap/HANDOFF.md open#3)")
-    p.add_argument("--note", help="一行裁决")
+    p.add_argument("--dest", required=True, help="Decision destination (for example docs/decisions.md#sampling)")
+    p.add_argument("--note", help="One-line decision")
     p.set_defaults(fn=cmd_graduate)
 
-    p = sub.add_parser("move", help="同 id 换 path (迁仓不丢评论史; 先自己移好 md)")
+    p = sub.add_parser("move", help="Change the path without losing review history (move the Markdown first)")
     p.add_argument("doc")
     p.add_argument("newpath")
     p.set_defaults(fn=cmd_move)
 
-    p = sub.add_parser("list", help="列注册文档+状态计数")
+    p = sub.add_parser("list", help="List registered documents and status counts")
     p.set_defaults(fn=cmd_list)
 
-    p = sub.add_parser("pending", help="列已提交未回答的评论")
+    p = sub.add_parser("pending", help="List delivered, unanswered comments")
     p.add_argument("--json", action="store_true")
-    p.add_argument("--doc", help="只看这些文档 (逗号分隔)")
+    p.add_argument("--doc", help="Only these document IDs (comma-separated)")
     p.set_defaults(fn=cmd_pending)
 
-    p = sub.add_parser("wait", help="阻塞等新批次 (给 run_in_background)")
+    p = sub.add_parser("wait", help="Wait for delivered work in the active process")
     p.add_argument("--timeout", type=float, default=86400)
     p.add_argument("--interval", type=float, default=2)
-    p.add_argument("--doc", help="只等这些文档, 逗号分隔 (多 agent 分工; v2.3 即认领)")
-    p.add_argument("--takeover", action="store_true", help="从别的活 session 手里抢值守")
+    p.add_argument("--doc", help="Watch and claim these document IDs (comma-separated)")
+    p.add_argument("--takeover", action="store_true", help="Explicitly take over another live session claim")
     p.set_defaults(fn=cmd_wait)
 
-    p = sub.add_parser("claims", help="谁在值守哪份文档 (机器本地)")
+    p = sub.add_parser("claims", help="Show local document watchers")
     p.set_defaults(fn=cmd_claims)
 
-    p = sub.add_parser("release", help="手放认领 (指定 doc 放那份; 不指定放本 session 全部)")
+    p = sub.add_parser("release", help="Release a document claim, or all claims owned by this session")
     p.add_argument("doc", nargs="?")
     p.set_defaults(fn=cmd_release)
 
-    p = sub.add_parser("unregister", help="摘掉注册条目 (sidecar/快照不动)")
+    p = sub.add_parser("unregister", help="Unregister without deleting sidecars or snapshots")
     p.add_argument("doc")
     p.set_defaults(fn=cmd_unregister)
 
-    p = sub.add_parser("rounds", help="列回合状态 (等他批准的顶到脸上)")
+    p = sub.add_parser("rounds", help="List review rounds and acceptance status")
     p.add_argument("doc", nargs="?")
     p.set_defaults(fn=cmd_rounds)
 
-    p = sub.add_parser("drafts", help="未提交草稿计数 (只报数, 不看内容)")
+    p = sub.add_parser("drafts", help="Count unsent drafts without exposing their contents")
     p.set_defaults(fn=cmd_drafts)
 
-    p = sub.add_parser("reply", help="纯文字回答一条评论")
+    p = sub.add_parser("reply", help="Answer a comment with text")
     p.add_argument("doc")
     p.add_argument("cid")
     p.add_argument("--text")
     p.add_argument("--file")
     p.add_argument("--summary", required=True)
-    p.add_argument("--doc-ref", help="外链答案 md (约定 <doc>.answers/<cid>-<slug>.md)")
+    p.add_argument("--doc-ref", help="Linked Markdown answer (convention: <doc>.answers/<cid>-<slug>.md)")
     p.set_defaults(fn=cmd_reply)
 
-    p = sub.add_parser("answer-edit", help="以改文档方式回答 (带 commit hash)")
+    p = sub.add_parser("answer-edit", help="Associate a document edit with a comment and commit")
     p.add_argument("doc")
     p.add_argument("cid")
     p.add_argument("--commit")
     p.add_argument("--note")
     p.add_argument("--summary", required=True)
-    p.add_argument("--doc-ref", help="外链答案 md (约定 <doc>.answers/<cid>-<slug>.md)")
+    p.add_argument("--doc-ref", help="Linked Markdown answer (convention: <doc>.answers/<cid>-<slug>.md)")
     p.set_defaults(fn=cmd_answer_edit)
 
-    p = sub.add_parser("answer-path", help="打印外链答案的约定路径 (不建目录)")
+    p = sub.add_parser("answer-path", help="Print the suggested answer path without creating directories")
     p.add_argument("doc")
     p.add_argument("cid")
     p.add_argument("slug", nargs="?")

@@ -6,12 +6,11 @@ A local Markdown review surface for a human working with a coding agent. Select 
 passage, ask a question, follow up in its thread, and inspect what changed in the
 document. Your existing agent answers through a CLI; the board does not call a model.
 
-![A synthetic review in the actual application](docs/assets/review.jpg)
+![A synthetic review in the actual application](docs/assets/review-en.jpg)
 
-This is the first public release, derived from the working v2.7 implementation.
-The source, an English guide, and synthetic examples are included. The current
-interface and parts of the source commentary are Chinese; [the button glossary](docs/USAGE.md#button-glossary)
-covers the main workflow. macOS and Linux are supported. Python 3.10+ is required;
+Derived from the working v2.7 implementation, this package includes an English
+interface and CLI, a usage guide, and synthetic examples. macOS and Linux are
+supported. Python 3.10+ is required;
 the server uses the standard library. Browser dependencies are vendored.
 
 ## Try the disposable demo

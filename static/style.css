@@ -208,7 +208,7 @@ button.tiny { padding: 1px 8px; font-size: 12px; position: absolute; right: 6px;
 /* ---------- sidebar (v2: 待办队列 — 一行式 + 过滤 chips) ---------- */
 #side { position: sticky; top: 100px; align-self: start; max-height: calc(100vh - 112px);
         overflow-y: auto; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-#chips { display: flex; gap: 6px; }
+#chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .fchip { padding: 2px 12px; font-size: 12.5px; background: transparent;
          color: var(--muted); border: 1px solid var(--line); border-radius: 12px; }
 .fchip.on { background: var(--accent); color: #fff; border-color: var(--accent); }
@@ -294,7 +294,7 @@ button.tiny.solid { background: var(--accent); color: #fff; }
 .cbody { padding: 0 10px 5px; }
 .cbody .meta { margin: 3px 0 1px; }
 .tl { gap: 2px; margin-top: 3px; }
-.tr { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 0 8px; align-items: baseline;
+.tr { display: grid; grid-template-columns: 90px minmax(0, 1fr); gap: 0 8px; align-items: baseline;
       padding: 1px 0 1px 6px; border-left: 2px solid var(--line); }
 .tr .who { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .tr .what { min-width: 0; font-size: 14px; }
@@ -335,7 +335,7 @@ button.tiny.solid { background: var(--accent); color: #fff; }
 .cov.all { background: var(--resolved-bg); color: var(--resolved); cursor: default; }
 .block.unseen::before { content: ""; position: absolute; left: 33px; top: 6px; bottom: 6px;
                         border-left: 3px dotted var(--draft); }
-.block.unseen:hover::after { content: "未看"; position: absolute; left: 4px; bottom: 2px;
+.block.unseen:hover::after { content: "Unread"; position: absolute; left: 4px; bottom: 2px;
                              font-size: 10px; color: var(--draft); }
 
 /* ---------- v2.3 F1 / B1: 首页 peers 分节 · 死条目灰显 ---------- */

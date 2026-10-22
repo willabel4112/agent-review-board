@@ -1,21 +1,22 @@
 # Usage
 
-## Button glossary
+## Main controls
 
-| Interface label | Meaning |
+| Control | Action |
 |---|---|
-| 立即发 / 发 | Send this comment or follow-up now |
-| 保存草稿 / 存 | Save a draft without delivering it |
-| 提交这批 | Review and submit the pending draft batch |
-| 看完了 | Mark the current document version as read |
-| 批准这版 | Accept the reviewed version when a round awaits acceptance |
-| 改动 / ●改 / +新 | Changes / modified block / added block |
-| 追问 | Follow-up question |
-| 解决 / 重开 | Resolve / reopen a thread |
-| 深入 / 探索 | Explore a question branch |
-| 返回原处 / 上一层 | Return to the original place / previous reading layer |
-| 值守 | The session currently waiting for this document |
-| 私有笔记 | Private note, excluded from submission |
+| Send now / Send | Deliver this comment or follow-up immediately |
+| Save draft / Save | Keep a draft without delivering it |
+| Submit batch | Review and submit the pending drafts together |
+| Mark as read | Mark the current document version as read |
+| Approve version | Accept the reviewed version when a round awaits acceptance |
+| Changes / ●Edit / +New | View the diff / inspect a modified block / identify a new block |
+| Request changes | Return a reviewed version with an explanation |
+| Follow-up | Continue a thread with another question |
+| Resolve / Reopen | Close or reopen a thread |
+| Explore | Open a question branch |
+| Back to source / Back one level | Restore the original place or previous reading layer |
+| Watching | The session currently waiting for this document |
+| Private note | Save a note excluded from submission and the agent queue |
 
 Select a passage to anchor a comment, or use the block comment control. Send one
 question immediately, or save several and submit them as a batch. A follow-up

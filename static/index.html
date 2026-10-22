@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -10,16 +10,16 @@
 <body>
 <header id="topbar"><span id="title">review-board</span></header>
 <main class="single">
-  <div id="gswrap"><input id="gsq" placeholder="🔍 搜所有板… (≥2 字; 正文·评论·答案·含归档)">
+  <div id="gswrap"><input id="gsq" placeholder="🔍 Search all boards… (2+ characters; includes archives)">
   <div id="gsres"></div></div>
-  <div id="doclist">加载中…</div>
+  <div id="doclist">Loading…</div>
   <div id="peers"></div>
-  <p class="hint">上板: <code>python3 ~/review-board/boardctl.py register &lt;path.md&gt;</code>
-     · 回环协议见 repo README</p>
+  <p class="hint">Register a document: <code>python3 boardctl.py register &lt;path.md&gt;</code>
+     · See the README for the agent workflow</p>
 </main>
 <script>
-const LBL = {open:"待答", draft:"⚠ 未提交", answered:"已答", resolved:"已解决"};
-const RLBL = {open:"", answered:"⏳ 等你批这版", approved:"✓ 已批准", rejected:"已打回, 等 agent"};
+const LBL = {open:"Pending", draft:"⚠ Drafts", answered:"Answered", resolved:"Resolved"};
+const RLBL = {open:"", answered:"⏳ Awaiting approval", approved:"✓ Approved", rejected:"Changes requested · waiting for agent"};
 const esc = (x) => String(x).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 function mk(doc, sat, base) {
   const a = document.createElement("a");
@@ -28,17 +28,17 @@ function mk(doc, sat, base) {
   const counts = Object.entries(doc.counts || {}).filter(([s]) => s !== "draft" || true);
   const chips = counts.map(([s,n])=>`<span class="chip s-${s}">${LBL[s]||s} ${n}</span>`).join(" ");
   const r = doc.round, rl = r ? RLBL[r.status] : "";
-  const rc = rl ? `<span class="chip s-${r.status==="answered"?"open":"resolved"}">回合${r.batch} ${rl}</span>` : "";
+  const rc = rl ? `<span class="chip s-${r.status==="answered"?"open":"resolved"}">Round ${r.batch} ${rl}</span>` : "";
   const born = doc.born && doc.born.cid ? `<span class="hint">⤴ born from #${doc.born.cid.slice(2)}</span> ` : "";
   const q = doc.question ? `<div class="dcq">❓ ${esc(doc.question.length>80?doc.question.slice(0,80)+"…":doc.question)}</div>` : "";
   // v2.3: 值守 (谁在 wait) + 看过 n/N
   const c = doc.claim;
   const cl = c ? `<span class="claim ${c.alive?"alive":"dead"}" title="${esc(c.cwd||"")} · ${(c.sid||"").slice(0,8)}">${c.alive?"●":"○"} ${esc(c.name)}@${esc(c.host)}</span> ` : "";
-  const dr = doc.draft ? `<span class="chip s-draft">✏️ 草稿</span> ` : "";
+  const dr = doc.draft ? `<span class="chip s-draft">✏️ Draft</span> ` : "";
   const cv = doc.coverage && doc.coverage.n_total
-    ? `<span class="cov ${doc.coverage.n_seen>=doc.coverage.n_total?"all":""}">看过 ${doc.coverage.n_seen}/${doc.coverage.n_total}</span> ` : "";
-  a.innerHTML = `<div class="dcname">${sat?"↳ ":""}${doc.emoji?`<span class="dcemoji">${esc(doc.emoji)}</span>`:""}${esc(doc.title)}${doc.exists?"":' <span class="hint">⚠ 本机无此文件 (boardctl unregister)</span>'}</div>
-    <div class="dcpath">${esc(doc.path)}</div>${q}<div>${dr}${born}${cl}${cv}${rc}${chips||(rc||born?"":'<span class="hint">无评论</span>')}</div>`;
+    ? `<span class="cov ${doc.coverage.n_seen>=doc.coverage.n_total?"all":""}">Read ${doc.coverage.n_seen}/${doc.coverage.n_total}</span> ` : "";
+  a.innerHTML = `<div class="dcname">${sat?"↳ ":""}${doc.emoji?`<span class="dcemoji">${esc(doc.emoji)}</span>`:""}${esc(doc.title)}${doc.exists?"":' <span class="hint">⚠ Local file missing (boardctl unregister)</span>'}</div>
+    <div class="dcpath">${esc(doc.path)}</div>${q}<div>${dr}${born}${cl}${cv}${rc}${chips||(rc||born?"":'<span class="hint">No comments</span>')}</div>`;
   return a;
 }
 function renderDocs(box, docs, base) {
@@ -53,14 +53,14 @@ function renderDocs(box, docs, base) {
     box.appendChild(mk(doc, false, base));
     const ks = kids[doc.id]||[];
     if (ks.length) {                       // v2.4 F12: 卫星默认折进母行
-      const det = mkDetails("sats", "sat:"+doc.id, `↳ 卫星 ${ks.length}`);
+      const det = mkDetails("sats", "sat:"+doc.id, `↳ Child documents ${ks.length}`);
       for (const k of ks) det.appendChild(mk(k, true, base));
       box.appendChild(det);
     }
   }
   if (dead.length) {
     const det = document.createElement("details");
-    det.innerHTML = `<summary class="hint">🗄 已归档 ${dead.length} 份</summary>`;
+    det.innerHTML = `<summary class="hint">🗄 Archived: ${dead.length}</summary>`;
     for (const doc of dead) det.appendChild(mk(doc, false, base));
     box.appendChild(det);
   }
@@ -81,8 +81,8 @@ fetch("/api/docs").then(r=>r.json()).then(d=>{
   const box = document.getElementById("doclist");
   if (d.host) document.getElementById("title").textContent = "review-board · " + d.host;
   box.innerHTML = "";
-  if (!d.docs.length) { box.textContent = "还没有注册任何文档。"; return; }
-  const det = mkDetails("msec", "local", `本机 · ${d.host||""} (${d.docs.filter(x=>!x.archived).length})`);
+  if (!d.docs.length) { box.textContent = "No documents registered yet."; return; }
+  const det = mkDetails("msec", "local", `Local · ${d.host||""} (${d.docs.filter(x=>!x.archived).length})`);
   renderDocs(det, d.docs, "");
   box.appendChild(det);
 });
@@ -91,14 +91,14 @@ fetch("/api/peers").then(r=>r.json()).then(d=>{
   const box = document.getElementById("peers");
   for (const peer of (d.peers || [])) {
     const sec = mkDetails("msec peer", "peer:"+peer.name,
-      `${peer.name} 的板 (${peer.ok?peer.docs.filter(x=>!x.archived).length:"未连"})`);
+      `${peer.name} board (${peer.ok?peer.docs.filter(x=>!x.archived).length:"Disconnected"})`);
     if (!peer.ok) {
       const h = document.createElement("div");
       h.className = "hint";
-      h.innerHTML = `未连: ${esc(peer.err||"")} — 隧道没起? <code>~/review-board/tunnel.sh &lt;ssh别名&gt; ${esc(peer.url.split(":").pop())} ${esc(peer.name)}</code>`;
+      h.innerHTML = `Disconnected: ${esc(peer.err||"")} — check the SSH tunnel. <code>./tunnel.sh &lt;ssh-host&gt; ${esc(peer.url.split(":").pop())} ${esc(peer.name)}</code>`;
       sec.appendChild(h);
     } else if (!peer.docs.length) {
-      const h = document.createElement("div"); h.className="hint"; h.textContent="那边没有注册文档"; sec.appendChild(h);
+      const h = document.createElement("div"); h.className="hint"; h.textContent="No documents registered on that host"; sec.appendChild(h);
     } else renderDocs(sec, peer.docs, peer.url);
     box.appendChild(sec);
   }
@@ -108,11 +108,11 @@ let gt=null;
 gsq.oninput=()=>{clearTimeout(gt); gt=setTimeout(async()=>{
   const q=gsq.value.trim();
   if(q.replace(/\s+/g,"").length<2){gres.innerHTML="";return;}
-  const KL={block:"正文",comment:"评论",answer:"答案",question:"❓"};
+  const KL={block:"Content",comment:"Comment",answer:"Answer",question:"❓"};
   try{
     const r=await fetch(`/api/search?q=${encodeURIComponent(q)}`);
     const hits=(await r.json()).hits||[];
-    gres.innerHTML=hits.length?"":'<div class="hint">没搜到</div>';
+    gres.innerHTML=hits.length?"":'<div class="hint">No results</div>';
     for(const h of hits){
       const a=document.createElement("a"); a.className="srow"; a.href=h.url;
       a.innerHTML=`<span class="chip s-draft">${KL[h.kind]||esc(h.kind)}</span>${h.archived?"🗄 ":""}<span class="sdoc"></span><span class="sex"></span>`;
@@ -122,7 +122,7 @@ gsq.oninput=()=>{clearTimeout(gt); gt=setTimeout(async()=>{
       else ex.textContent=t;
       gres.appendChild(a);
     }
-  }catch(e){gres.innerHTML='<div class="hint">搜索失败</div>';}
+  }catch(e){gres.innerHTML='<div class="hint">Search failed</div>';}
 },300);};
 </script>
 </body>

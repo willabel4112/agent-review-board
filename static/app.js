@@ -11,12 +11,12 @@ const FOCUS_THREAD = MODE === "d" && /^c-\d+$/.test(new URLSearchParams(location
   ? new URLSearchParams(location.search).get("thread") : null;
 const $ = (id) => document.getElementById(id);
 const DARK = matchMedia("(prefers-color-scheme: dark)").matches;
-const LBL = { open: "待答", draft: "草稿", answered: "已答", resolved: "已解决" };
+const LBL = { open: "Pending", draft: "Draft", answered: "Answered", resolved: "Resolved" };
 const RANK = { open: 0, draft: 1, answered: 2, resolved: 3 };
 const ASTAT = {
-  modified: "✎ 这块已按你的意见改写",
-  deleted: "⚠ 这块在新版里没了 (下面是你评论时的原文)",
-  unknown: "⚠ 未锚定 · 原文引用",
+  modified: "✎ This passage has been revised",
+  deleted: "⚠ This passage was removed; the original quotation is shown below",
+  unknown: "⚠ Unanchored · original quotation",
 };
 
 let DOC = null, THREADS = [], ROUND = null, mtime = 0, mmdN = 0;
@@ -87,7 +87,7 @@ function renderOutline() {
       const sync = () => {
         const closed = foldedToc.has(h.key);
         children.hidden = closed; toggle.textContent = closed ? "▸" : "▾";
-        toggle.setAttribute("aria-label", `${closed ? "展开" : "折叠"}目录 ${h.text}`);
+        toggle.setAttribute("aria-label", `${closed ? "Expand" : "Collapse"} outline ${h.text}`);
         toggle.setAttribute("aria-expanded", String(!closed));
       };
       toggle.onclick = () => {
@@ -119,7 +119,7 @@ function syncSections() {
     if (btn) {
       btn.textContent = closed ? "▸" : "▾";
       btn.setAttribute("aria-expanded", String(!closed));
-      btn.setAttribute("aria-label", `${closed ? "展开" : "折叠"}章节 ${h.text}`);
+      btn.setAttribute("aria-label", `${closed ? "Expand" : "Collapse"} section ${h.text}`);
     }
     let hint = sec.querySelector(".section-summary");
     if (!hint) { hint = document.createElement("div"); hint.className = "section-summary"; sec.appendChild(hint); }
@@ -127,7 +127,7 @@ function syncSections() {
     if (closed) {
       const ts = THREADS.filter(t => t.block > h.i && t.block < h.end);
       const drafts = ts.reduce((n, t) => n + (t.status === "draft" && t.kind !== "note" ? 1 : 0) + RBNav.followups(t).drafts, 0);
-      hint.textContent = `已折叠 ${h.end - h.i - 1} 块 · ${ts.length} 条评论${drafts ? ` · ${drafts} 条未提交` : ""}`;
+      hint.textContent = `${h.end - h.i - 1} blocks collapsed · ${ts.length} comments${drafts ? ` · ${drafts} drafts` : ""}`;
     }
   }
 }
@@ -199,7 +199,7 @@ async function renderMermaid(holder, code) {
     const { svg } = await mermaid.render("mmd" + (++mmdN), code);
     holder.innerHTML = svg;
   } catch (e) {
-    holder.innerHTML = `<div class="mmderr">mermaid 渲染失败: ${esc(e.message || e)}</div>`;
+    holder.innerHTML = `<div class="mmderr">Mermaid rendering failed: ${esc(e.message || e)}</div>`;
     const pre = document.createElement("pre");
     pre.textContent = code;
     holder.appendChild(pre);
@@ -216,7 +216,7 @@ function blockBody(b, plain) {
   if (mmd && !plain) {
     const holder = document.createElement("div");
     holder.className = "mmd";
-    holder.textContent = "渲染中…";
+    holder.textContent = "Rendering…";
     body.appendChild(holder);
     renderMermaid(holder, mmd[1]);
   } else if (!plain && b.i === 0 && b.md.startsWith("---")) {
@@ -241,7 +241,7 @@ function addCopyButtons(root) {
     if (pre.querySelector(".cpbtn")) return;
     const code = pre.querySelector("code") || pre;
     const btn = document.createElement("button");
-    btn.className = "cpbtn"; btn.type = "button"; btn.textContent = "copy"; btn.title = "复制整块";
+    btn.className = "cpbtn"; btn.type = "button"; btn.textContent = "copy"; btn.title = "Copy code block";
     const done = () => { btn.textContent = "✓"; btn.classList.add("done");
       setTimeout(() => { btn.textContent = "copy"; btn.classList.remove("done"); }, 1200); };
     const fallback = (txt) => {
@@ -264,10 +264,10 @@ function chgMark(b) {
   if (!b.chg) return null;
   const m = document.createElement("button");
   m.className = "chgmark c-" + b.chg;
-  m.textContent = b.chg === "new" ? "+新" : "●改";
+  m.textContent = b.chg === "new" ? "+New" : "●Edit";
   const cz = (DOC.causes || []).map(c => "#" + c.slice(2)).join(" ");
-  m.title = `回合${ROUND ? ROUND.batch : "?"} 改动${cz ? " · 回应 " + cz : ""}` +
-    (b.chg === "mod" ? " · 点击看旧版" : " · 整块新增");
+  m.title = `Round ${ROUND ? ROUND.batch : "?"} changes${cz ? " · addresses " + cz : ""}` +
+    (b.chg === "mod" ? " · view previous version" : " · new block");
   m.onclick = (ev) => { ev.stopPropagation(); toggleOld(b); };
   return m;
 }
@@ -283,9 +283,9 @@ function oldPanel(b) {
   const d = document.createElement("div");
   d.className = "oldver";
   if (old === undefined) {
-    d.innerHTML = `<div class="oldhead">${b.chg === "new" ? "这块是新增的 — 上一版没有它" : "旧版取不到 (快照不在了)"}</div>`;
+    d.innerHTML = `<div class="oldhead">${b.chg === "new" ? "New block; no previous version" : "Previous version unavailable (snapshot missing)"}</div>`;
   } else {
-    d.innerHTML = `<div class="oldhead">上一版 ↓</div>`;
+    d.innerHTML = `<div class="oldhead">Previous version ↓</div>`;
     d.appendChild(blockBody({ i: -1, md: old }, true));
   }
   return d;
@@ -309,7 +309,7 @@ function renderBlocks() {
       const btn = document.createElement("button");
       btn.className = "cbtn";
       btn.textContent = "✚";
-      btn.title = "评论此块";
+      btn.title = "Comment on this block";
       btn.onclick = (ev) => { ev.stopPropagation(); openComposer(b, sec); };
       sec.appendChild(btn);
     }
@@ -342,14 +342,14 @@ function renderBlocks() {
 function renderDiff() {
   const art = $("doc");
   art.innerHTML = "";
-  if (!DIFF) { art.innerHTML = '<p class="hint">加载改动…</p>'; return; }
+  if (!DIFF) { art.innerHTML = '<p class="hint">Loading changes…</p>'; return; }
   if (DIFF.err) { art.innerHTML = `<p class="hint">${esc(DIFF.err)}</p>`; return; }
   let run = 0;
   const flushRun = () => {
     if (!run) return;
     const d = document.createElement("div");
     d.className = "samerun";
-    d.textContent = `${run} 块未变`;
+    d.textContent = `${run} unchanged blocks`;
     art.appendChild(d);
     run = 0;
   };
@@ -358,14 +358,14 @@ function renderDiff() {
     flushRun();
     const d = document.createElement("div");
     d.className = "dop d-" + op.op;
-    const lbl = { mod: "改写", add: "新增", del: "删除" }[op.op];
+    const lbl = { mod: "Modified", add: "Added", del: "Deleted" }[op.op];
     d.innerHTML = `<div class="dhead"><span class="dtag t-${op.op}">${lbl}</span>` +
-      `<span class="hint">@${esc(op.slug || "")}${op.op === "mod" ? " · 相似度 " + op.sim : ""}</span></div>`;
+      `<span class="hint">@${esc(op.slug || "")}${op.op === "mod" ? " · similarity " + op.sim : ""}</span></div>`;
     if (op.old_md !== undefined) {
       const o = document.createElement("div");
       o.className = "dside dold";
       if (op.op === "mod") o.appendChild(Object.assign(document.createElement("div"),
-        { className: "oldhead", textContent: "旧" }));
+        { className: "oldhead", textContent: "Before" }));
       o.appendChild(blockBody({ i: -1, md: op.old_md }, true));
       d.appendChild(o);
     }
@@ -373,7 +373,7 @@ function renderDiff() {
       const n = document.createElement("div");
       n.className = "dside dnew";
       if (op.op === "mod") n.appendChild(Object.assign(document.createElement("div"),
-        { className: "oldhead", textContent: "新" }));
+        { className: "oldhead", textContent: "After" }));
       n.appendChild(blockBody({ i: -1, md: op.new_md }, true));
       d.appendChild(n);
     }
@@ -426,10 +426,10 @@ function renderRound(force) {
   // v2.3「批准」与「看完了」合一: 同一按钮, 名字随上下文 (c-0009 拍板)
   const sb = $("seenBtn");
   const approving = !!(ROUND && ROUND.status === "answered");
-  sb.textContent = approving ? "批准这版" : "看完了";
+  sb.textContent = approving ? "Approve version" : "Mark as read";
   sb.className = approving ? "" : "ghost";
-  sb.title = approving ? "批准 = 这版我认了 (同时记为全看过; 改动标记清场)"
-    : "看完了 = 这版每一块都记为看过 (沉默不再算没看); 改写过的块会自动回到未看";
+  sb.title = approving ? "Accept this version, mark all blocks as read, and clear change markers"
+    : "Mark all blocks in this version as read; revised blocks become unread again";
   if (!ROUND) { bar.hidden = true; return; }
   bar.hidden = false;
   bar.className = "r-" + ROUND.status;
@@ -438,17 +438,17 @@ function renderRound(force) {
   const cz = (DOC && DOC.causes || []).map(c => "#" + c.slice(2)).join(" ");
   let head, actions = [];
   if (ROUND.status === "open") {
-    head = `回合 ${ROUND.batch} · 已提交 ${ROUND.n_ids} 条, 已答 ${ROUND.n_answered} 条 — 等 agent`;
+    head = `Round ${ROUND.batch} · ${ROUND.n_answered}/${ROUND.n_ids} answered · waiting for agent`;
   } else if (ROUND.status === "answered") {
     // nchg===null 是"不知道"不是"没改" (v0 老回合没有版本记录) — 别把未知说成事实
-    const chgTxt = nchg === null ? " · 改动未知 (这轮没有版本记录)"
-      : nchg === 0 ? " · 未改文档" : ` · 文档改了 ${nchg} 块`;
-    head = `回合 ${ROUND.batch} 已回应${chgTxt}` + (cz ? ` (${cz})` : "") + " — 批准在右上 ↗";
-    actions = [["打回", () => openComposer(null, null, "reject"), "ghost"]];
+    const chgTxt = nchg === null ? " · changes unknown (no revision record)"
+      : nchg === 0 ? " · no document edits" : ` · ${nchg} ${nchg === 1 ? "block" : "blocks"} changed`;
+    head = `Round ${ROUND.batch} answered${chgTxt}` + (cz ? ` (${cz})` : "") + " — review, then approve above ↗";
+    actions = [["Request changes", () => openComposer(null, null, "reject"), "ghost"]];
   } else if (ROUND.status === "approved") {
-    head = `回合 ${ROUND.batch} ✓ 已批准${ROUND.approve_note ? " · " + ROUND.approve_note : ""}`;
+    head = `Round ${ROUND.batch} ✓ approved${ROUND.approve_note ? " · " + ROUND.approve_note : ""}`;
   } else if (ROUND.status === "rejected") {
-    head = `回合 ${ROUND.batch} 已打回 — 等 agent 重做`;
+    head = `Round ${ROUND.batch} returned · waiting for revision`;
   }
   bar.innerHTML = `<span class="rhead">${esc(head)}</span>`;
   for (const [txt, fn, cls] of actions) {
@@ -473,25 +473,25 @@ function openComposer(b, sec, mode, extra) {
   const q = $("cquote"), ta = $("ctext"), save = $("csave"), send = $("csend");
   send.hidden = !["comment", "explore"].includes(composeMode);
   $("cexplore").hidden = composeMode !== "comment";
-  send.textContent = composeMode === "explore" ? "发起探索" : "立即发";
+  send.textContent = composeMode === "explore" ? "Start exploration" : "Send now";
   if (["comment", "explore"].includes(composeMode)) {
-    q.textContent = composeSel ? `〝${composeSel.text.slice(0, 90)}〞 @${b.slug}`
-      : composeQuote ? `〝${composeQuote.slice(0, 90)}〞 @${b.slug}`
-      : b ? "@" + b.slug + " · " + norm(b.md).slice(0, 90) : "整篇";
-    ta.placeholder = composeMode === "explore" ? "你想从这里弄清什么？发出后成为独立探索分支。" : "评论… (⌘Enter 保存草稿)";
-    save.textContent = "保存草稿";
+    q.textContent = composeSel ? `“${composeSel.text.slice(0, 90)}” @${b.slug}`
+      : composeQuote ? `“${composeQuote.slice(0, 90)}” @${b.slug}`
+      : b ? "@" + b.slug + " · " + norm(b.md).slice(0, 90) : "Whole document";
+    ta.placeholder = composeMode === "explore" ? "What would you like to understand? Send to start a question branch." : "Comment… (⌘/Ctrl+Enter saves a draft)";
+    save.textContent = "Save draft";
   } else if (composeMode === "note") {
-    q.textContent = "📝 私有笔记 — agent 永远看不见, 不进「提交这批」, 只存在 sidecar (git) 里";
-    ta.placeholder = "笔记… (session 书签 / 待办 / 随想; ⌘Enter 存)";
-    save.textContent = "存笔记";
+    q.textContent = "📝 Private note · excluded from submission and the agent queue; stored locally";
+    ta.placeholder = "Note… (bookmarks, tasks, thoughts; ⌘/Ctrl+Enter saves)";
+    save.textContent = "Save note";
   } else if (composeMode === "approve") {
-    q.textContent = `批准回合 ${ROUND.batch} — 这版可以按它干了`;
-    ta.placeholder = "可选: 一行批语 (⌘Enter 批准)";
-    save.textContent = "批准这版";
+    q.textContent = `Approve round ${ROUND.batch} · accept this version`;
+    ta.placeholder = "Optional approval note (⌘/Ctrl+Enter approves)";
+    save.textContent = "Approve version";
   } else {
-    q.textContent = `打回回合 ${ROUND.batch} — 会作为新一批发给 agent`;
-    ta.placeholder = "这版哪里不行? (必填, ⌘Enter 打回)";
-    save.textContent = "打回";
+    q.textContent = `Request changes to round ${ROUND.batch} · send a new batch to the agent`;
+    ta.placeholder = "What needs to change? (Required; ⌘/Ctrl+Enter sends)";
+    save.textContent = "Request changes";
   }
   $("composer").hidden = false;
   ta.focus();
@@ -510,7 +510,7 @@ $("csave").onclick = () => submitComposer(false);
 $("csend").onclick = () => submitComposer(true);
 $("cexplore").onclick = () => {
   if (!$("ctext").value.trim()) { $("ctext").focus(); return; }
-  composeMode = "explore"; $("csend").textContent = "发起探索"; $("cexplore").hidden = true;
+  composeMode = "explore"; $("csend").textContent = "Start exploration"; $("cexplore").hidden = true;
   submitComposer(true);
 };
 $("ctext").addEventListener("keydown", (e) => {
@@ -533,19 +533,19 @@ async function saveComposer(sendNow) {
   const text = $("ctext").value.trim();
   if (composeMode === "approve") {
     const r = await api("/api/approve", { doc: docid, batch: ROUND.batch, note: text });
-    if (r.ok) { toast(`回合 ${r.batch} 已批准 — 改动标记清场`); closeComposer(); refresh(true); }
+    if (r.ok) { toast(`Round ${r.batch} approved · change markers cleared`); closeComposer(); refresh(true); }
     return;
   }
   if (composeMode === "reject") {
-    if (!text) { toast("打回要写一行理由"); return; }
+    if (!text) { toast("Please explain what needs to change"); return; }
     const r = await api("/api/reject", { doc: docid, batch: ROUND.batch, note: text });
-    if (r.ok) { toast(`已打回 — 作为批次 ${r.batch} 发给 agent`); closeComposer(); refresh(true); }
+    if (r.ok) { toast(`Changes requested · sent as batch ${r.batch}`); closeComposer(); refresh(true); }
     return;
   }
   if (!text) return;
   if (composeMode === "note") {
     const r = await api("/api/comment", { doc: docid, text, kind: "note", anchor: null });
-    if (r.ok) { toast(`笔记已存 #${r.id.slice(2)} (只有你看得见)`); closeComposer(); refresh(); }
+    if (r.ok) { toast(`Note #${r.id.slice(2)} saved · excluded from the agent queue`); closeComposer(); refresh(); }
     return;
   }
   const b = composeBlock;
@@ -560,8 +560,8 @@ async function saveComposer(sendNow) {
     kind: b ? "block" : "doc",
     ...(exploring ? { intent: "explore" } : {}) });
   if (r.ok) {
-    toast(sendNow ? `已发送 #${r.id.slice(2)}，等待回应` :
-      `草稿已存 #${r.id.slice(2)} — 记得「提交这批」`);
+    toast(sendNow ? `Sent #${r.id.slice(2)} · waiting for a response` :
+      `Draft #${r.id.slice(2)} saved · use Submit batch to deliver it`);
     closeComposer(); await refresh();
     if (exploring && sendNow) { RBExplore.refresh(true); RBExplore.openThread(docid, r.id, text.split("\n")[0]); }
   }
@@ -818,39 +818,39 @@ function turnEl(t, u) {
     d = turnRow(esc(u.author || "Reviewer"), "m-me");
     d.querySelector(".what").innerHTML = marked.parse(txt);
   } else if (u.kind === "followup") {
-    d = turnRow(esc(u.author || "Reviewer") + " 追问", "m-me" + (u.draft ? " m-draft" : ""));
+    d = turnRow(esc(u.author || "Reviewer") + " Follow-up", "m-me" + (u.draft ? " m-draft" : ""));
     w = d.querySelector(".what");
     w.innerHTML = marked.parse(u.text || "") +
-      (u.draft ? '<span class="tchip s-draft">随批次</span>' : "");
+      (u.draft ? '<span class="tchip s-draft">With next batch</span>' : "");
     if (u.draft) {
       const deliver = document.createElement("button");
-      deliver.className = "tiny solid"; deliver.textContent = "发"; deliver.title = "只发送这条追问";
+      deliver.className = "tiny solid"; deliver.textContent = "Send"; deliver.title = "Send only this follow-up";
       deliver.onclick = () => api("/api/followup/send", { doc: docid, id: u.id })
-        .then(r => { if (r.ok) { toast("这条追问已发送"); refresh(); RBExplore.refresh(true); } });
+        .then(r => { if (r.ok) { toast("Follow-up sent"); refresh(); RBExplore.refresh(true); } });
       w.appendChild(deliver);
       const undo = document.createElement("button");
       undo.className = "ghost tiny";
-      undo.textContent = "撤";
+      undo.textContent = "Discard";
       undo.onclick = () => api("/api/comment/drop", { doc: docid, id: u.id })
-        .then(r => { if (r.ok) { toast("追问草稿已撤"); refresh(); } });
+        .then(r => { if (r.ok) { toast("Follow-up draft discarded"); refresh(); } });
       w.appendChild(undo);
     }
   } else if (u.kind === "reply") {
     d = turnRow("↳ " + esc(u.author || "agent"), "m-agent");
     w = d.querySelector(".what");
     w.innerHTML = (u.doc_ref_url
-      ? `${esc((u.text || "").split("\n")[0].slice(0, 160))} <a class="tchip s-ref" href="${esc(u.doc_ref_url)}" target="_blank" rel="noopener">→ 全文</a>`
+      ? `${esc((u.text || "").split("\n")[0].slice(0, 160))} <a class="tchip s-ref" href="${esc(u.doc_ref_url)}" target="_blank" rel="noopener">→ Full answer</a>`
       : marked.parse(u.text || ""));           // session chip 只挂结论行 (每条 reply 必配 answer)
   } else if (u.kind === "graduate") {
-    d = turnRow("⤤ 毕业", "m-grad");
+    d = turnRow("⤤ Recorded decision", "m-grad");
     d.querySelector(".what").innerHTML = `→ ${esc(u.dest || "")}${u.note ? " · " + esc(u.note) : ""}`;
   } else if (u.kind === "answer") {
-    d = turnRow("↳ 结论", "m-agent m-answer");
+    d = turnRow("↳ Summary", "m-agent m-answer");
     let h = `<span class="tlsum">${esc(u.summary || "")}</span>`;
     if (u.mode === "edit")
-      h += ` <span class="tchip s-edit" title="已按此评论改了文档${u.commit ? " · commit " + esc(u.commit) : ""}">✎ ${u.commit ? esc(u.commit).slice(0, 8) : "已改文档"}</span>`;
+      h += ` <span class="tchip s-edit" title="Document edited in response to this comment${u.commit ? " · commit " + esc(u.commit) : ""}">✎ ${u.commit ? esc(u.commit).slice(0, 8) : "Edited"}</span>`;
     if (u.doc_ref_url)
-      h += ` <a class="tchip s-ref" href="${esc(u.doc_ref_url)}" target="_blank" rel="noopener">→ 全文</a>`;
+      h += ` <a class="tchip s-ref" href="${esc(u.doc_ref_url)}" target="_blank" rel="noopener">→ Full answer</a>`;
     h += sessChip(u);
     d.querySelector(".what").innerHTML = h;
   }
@@ -869,12 +869,12 @@ function buildCard(t) {
   const one = first.length > 110 ? first.slice(0, 110) + "…" : first;
   const lost = t.kind === "block" && (t.block === null || t.block === undefined);
   const where = t.kind === "block" && !lost && t.anchor && t.anchor.slug
-    ? `<a class="locate" title="定位原文：${esc(anchorText(t))} · @${esc(t.anchor.slug)}">↗ ${esc(anchorText(t).slice(0, 32) || t.anchor.slug.slice(0, 22))}</a>` : "";
+    ? `<a class="locate" title="Go to quotation: ${esc(anchorText(t))} · @${esc(t.anchor.slug)}">↗ ${esc(anchorText(t).slice(0, 32) || t.anchor.slug.slice(0, 22))}</a>` : "";
   const warn = lost ? `<span class="hint" title="${esc(ASTAT[t.anchor_status] || ASTAT.unknown)}">⚠</span>`
     : t.anchor_status === "modified" ? `<span class="amod" title="${ASTAT.modified}">✎</span>` : "";
   head.innerHTML = `<span class="caret">${open ? "▾" : "▸"}</span>` +
-    `<span class="chip s-${t.status}">${isNote ? "笔记" : LBL[t.status]}</span>` +
-    (t.graduated ? `<span class="gmark" title="已毕业 → ${esc((t.graduated || {}).dest || "")}">⤤</span>` : "") +
+    `<span class="chip s-${t.status}">${isNote ? "Note" : LBL[t.status]}</span>` +
+    (t.graduated ? `<span class="gmark" title="Recorded in → ${esc((t.graduated || {}).dest || "")}">⤤</span>` : "") +
     `<b>#${t.id.slice(2)}</b> <span class="one">${esc(one)}` +
     (!open && t.summary ? ` <span class="hsum">↳ ${esc(t.summary)}</span>` : "") +
     `</span><span class="hact">${warn}${where}</span>`;
@@ -888,17 +888,17 @@ function buildCard(t) {
     act.appendChild(b);
   };
   if (t.status === "draft") {
-    add("改", () => editDraft(t));
-    add("撤", () => api("/api/comment/drop", { doc: docid, id: t.id }).then(() => {
-      expanded.delete(t.id); toast((isNote ? "笔记" : "草稿") + "已撤 #" + t.id.slice(2)); refresh();
+    add("Edit", () => editDraft(t));
+    add("Discard", () => api("/api/comment/drop", { doc: docid, id: t.id }).then(() => {
+      expanded.delete(t.id); toast((isNote ? "Note" : "Draft") + " discarded #" + t.id.slice(2)); refresh();
     }));
   }
   if (t.status === "answered" || t.status === "open")
-    add("✓", () => api("/api/resolve", { doc: docid, id: t.id }).then(() => refresh()), "solid", "解决");
+    add("✓", () => api("/api/resolve", { doc: docid, id: t.id }).then(() => refresh()), "solid", "Resolve");
   if (t.status === "resolved" || t.status === "answered")
-    add("↺", () => api("/api/reopen", { doc: docid, id: t.id }).then(() => refresh()), "ghost", "重开");
+    add("↺", () => api("/api/reopen", { doc: docid, id: t.id }).then(() => refresh()), "ghost", "Reopen");
   if (t.status !== "draft" && !isNote && !FOCUS_THREAD)
-    add("↗ 探索", () => RBExplore.promote(t), "ghost", "把这一问放进探索树，独立深入");
+    add("↗ Explore", () => RBExplore.promote(t), "ghost", "Add this question to the exploration tree");
   const lk = head.querySelector(".locate");
   if (lk) lk.onclick = (ev) => { ev.stopPropagation(); locateThread(t); };
   head.onclick = () => {
@@ -913,10 +913,10 @@ function buildCard(t) {
   body.className = "cbody";
   const st = t.anchor_status;
   let note = "";
-  if (t.kind === "reject") note = `打回第 ${t.re_batch} 回合`;
+  if (t.kind === "reject") note = `Changes requested for round ${t.re_batch}`;
   else if (lost) note = `${ASTAT[st] || ASTAT.unknown}: ${esc(((t.anchor || {}).quote || "").slice(0, 80))}`;
-  else if (anchorText(t)) note = `<span class="selq">引用原文：〝${esc(anchorText(t))}〞</span>` +
-    (t.sel_status === "gone" ? ' <span class="hint">原文有变化；若无法匹配完整引文则定位到整块</span>' : "");
+  else if (anchorText(t)) note = `<span class="selq">Original quotation: “${esc(anchorText(t))}”</span>` +
+    (t.sel_status === "gone" ? ' <span class="hint">The source has changed; use the containing block if the full quotation no longer matches</span>' : "");
   if (note) {
     const m = document.createElement("div");
     m.className = "meta";
@@ -939,11 +939,11 @@ function buildCard(t) {
   }
 
   if (t.status !== "draft") {               // thread 追问: 单行同排「发 / 存」(B8 规则 5)
-    const fup = turnRow("↳ 追问", "m-fup");
+    const fup = turnRow("↳ Follow-up", "m-fup");
     const w = fup.querySelector(".what");
     const ta = document.createElement("textarea");
     ta.rows = 1;
-    ta.placeholder = "追问… (⌘Enter 存草稿)";
+    ta.placeholder = "Follow up… (⌘/Ctrl+Enter saves a draft)";
     ta.value = UNSENT_FOLLOWUPS.get(t.id) || "";
     ta.addEventListener("input", () => {
       if (ta.value) UNSENT_FOLLOWUPS.set(t.id, ta.value); else UNSENT_FOLLOWUPS.delete(t.id);
@@ -956,7 +956,7 @@ function buildCard(t) {
       if (!v) return;
       const r = await api("/api/followup", { doc: docid, id: t.id, text: v, send: now });
       if (r.ok) {
-        toast(now ? "追问已发送，等待回应" : "追问已存草稿 — 随下一批送达");
+        toast(now ? "Follow-up sent · waiting for a response" : "Follow-up saved · delivered with the next batch");
         ta.value = "";
         UNSENT_FOLLOWUPS.delete(t.id);
         refresh();
@@ -964,13 +964,13 @@ function buildCard(t) {
     };
     const b1 = document.createElement("button");
     b1.className = "tiny solid";
-    b1.textContent = "发";
-    b1.title = "立即发送这条追问";
+    b1.textContent = "Send";
+    b1.title = "Send this follow-up now";
     b1.onclick = () => send(true);
     const b2 = document.createElement("button");
     b2.className = "tiny ghost";
-    b2.textContent = "存";
-    b2.title = "存草稿, 随下一批提交";
+    b2.textContent = "Save";
+    b2.title = "Save draft for the next batch";
     b2.onclick = () => send(false);
     btns.appendChild(b1); btns.appendChild(b2);
     ta.onfocus = () => { btns.hidden = false; };
@@ -995,8 +995,8 @@ function buildRow(t) {
   d.innerHTML = `<div class="row-main"><span class="chip s-${t.status}">${LBL[t.status]}</span>` +
     `<b>#${t.id.slice(2)}</b> <span class="one">${esc(oneLine(t))}</span>` +
     `</div>` +
-    (anchorText(t) ? `<div class="row-quote" title="${esc(anchorText(t))}">〝${esc(anchorText(t))}〞</div>` : "") +
-    (f.latest ? `<div class="row-followup${f.drafts ? " has-draft" : ""}" title="${esc(f.latest.text || "")}"><b>${f.drafts ? `追问草稿 ${f.drafts}` : "↳ 追问"}</b> ${esc(f.latest.text || "")}</div>` : "");
+    (anchorText(t) ? `<div class="row-quote" title="${esc(anchorText(t))}">“${esc(anchorText(t))}”</div>` : "") +
+    (f.latest ? `<div class="row-followup${f.drafts ? " has-draft" : ""}" title="${esc(f.latest.text || "")}"><b>${f.drafts ? `Draft follow-ups: ${f.drafts}` : "↳ Follow-up"}</b> ${esc(f.latest.text || "")}</div>` : "");
   d.onclick = () => { expanded.add(t.id); locateThread(t); };
   d.onkeydown = e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); d.click(); } };
   return d;
@@ -1007,14 +1007,14 @@ function editDraft(t) {
   openComposer(null, null, "comment");
   $("csend").hidden = true;
   $("cexplore").hidden = true;
-  $("cquote").textContent = "改草稿 #" + t.id.slice(2) + " (只有草稿能改)";
+  $("cquote").textContent = "Edit draft #" + t.id.slice(2) + " (only drafts can be edited)";
   $("ctext").value = t.text;
-  $("csave").textContent = "存改动";
+  $("csave").textContent = "Save changes";
   $("csave").onclick = async () => {
     const nt = $("ctext").value.trim();
     if (!nt) return;
     const r = await api("/api/comment/edit", { doc: docid, id: t.id, text: nt });
-    if (r.ok) { toast("草稿已改 #" + t.id.slice(2)); closeComposer(); refresh(); }
+    if (r.ok) { toast("Draft updated #" + t.id.slice(2)); closeComposer(); refresh(); }
   };
 }
 
@@ -1031,7 +1031,7 @@ function updateBadge(sec, ts) {
   const txt = "💬" + ts.length;
   if (!badge) {
     badge = document.createElement("button");
-    badge.title = "展开/收起这块的评论";
+    badge.title = "Expand or collapse comments on this block";
     badge.onclick = (ev) => {
       ev.stopPropagation();
       const bi = +sec.dataset.i;
@@ -1073,7 +1073,7 @@ function patchInline() {
     patchList(el.querySelector(".ilive"), live, t => t.id, cardSig, buildCard);
     const fold = el.querySelector(".donefold");
     fold.hidden = done.length === 0;
-    fold.querySelector("summary").textContent = `✓ ${done.length} 条已解决`;
+    fold.querySelector("summary").textContent = `✓ ${done.length} resolved`;
     patchList(el.querySelector(".idone"), done, t => t.id, cardSig, buildCard);
   }
 }
@@ -1106,7 +1106,7 @@ function patchSide() {
   document.querySelectorAll("#chips .fchip").forEach(c => {
     const f = c.dataset.f;
     c.classList.toggle("on", f === FILTER);
-    c.textContent = ({ todo: "未解决", drafts: "未提交", followups: "追问", all: "全部", resolved: "已解决" })[f] +
+    c.textContent = ({ todo: "Unresolved", drafts: "Drafts", followups: "Follow-up", all: "All", resolved: "Resolved" })[f] +
       (chipN[f] ? " " + chipN[f] : "");
   });
   $("counts").textContent = ["open", "answered", "resolved"]
@@ -1119,10 +1119,10 @@ function patchSide() {
   const notes = THREADS.filter(t => t.kind === "note").length;   // v2.3: 笔记永远 draft 但不算「未提交」
   const drafts = (counts.draft || 0) - notes + fdrafts.length;
   $("draftchip").hidden = drafts === 0;
-  $("draftchip").textContent = `${drafts} 条未提交`;
+  $("draftchip").textContent = `${drafts} drafts`;
   const sb = $("submitBtn");
   sb.disabled = drafts === 0;
-  sb.textContent = drafts ? `提交这批 (${drafts})` : "提交这批";
+  sb.textContent = drafts ? `Submit batch (${drafts})` : "Submit batch";
   syncSections(); syncActiveThread();
 }
 
@@ -1183,12 +1183,12 @@ function rerender(force) {
   if (!DOC) return;
   if (FOCUS_THREAD) {
     const t = THREADS.find(item => item.id === FOCUS_THREAD && item.kind !== "note");
-    if (!t) { $("doc").textContent = "这个分支暂时不可用，回到原文查看。"; return; }
+    if (!t) { $("doc").textContent = "This branch is unavailable. Return to the source document."; return; }
     expanded.add(t.id);
     patchList($("doc"), [t], item => item.id, cardSig, buildCard);
     $("title").textContent = t.text.split("\n")[0];
     document.title = t.text.split("\n")[0] + " · review-board";
-    $("branchStatus").textContent = t.status === "open" ? "问题已送达 · 等待回应，你可以继续追问" : t.status === "draft" ? "尚未提交" : "沿着这一问继续探索，或带着结论回到原文";
+    $("branchStatus").textContent = t.status === "open" ? "Question delivered · awaiting a response; you can add a follow-up" : t.status === "draft" ? "Not submitted" : "Explore this question further, or return to the source with your conclusion";
     return;
   }
   renderRound(force);
@@ -1237,7 +1237,7 @@ function scrollSettle(el) {
 }
 
 async function locateThread(t, retried) {
-  if (!t) { toast("⚠ 定位失败 — 线程不在了"); return; }
+  if (!t) { toast("⚠ Thread no longer available"); return; }
   if (FOCUS_THREAD) { RBExplore.source(t.id); return; }
   if (VIEW !== "doc") setView("doc");
   activeThread = t.id;
@@ -1250,7 +1250,7 @@ async function locateThread(t, retried) {
   const ok = t.block !== null && t.block !== undefined && DOC &&
     DOC.blocks[t.block] && t.block_hash && DOC.blocks[t.block].hash === t.block_hash;
   if (!ok) {
-    if (retried) { toast("⚠ 定位失败 — 文档刚变了, 已重试过一次"); return; }
+    if (retried) { toast("⚠ The document changed; location was retried once"); return; }
     await loadDoc();                       // 客户端块表可能滞后 — 强制取齐再试一次
     const r = await api(`/api/threads/${encodeURIComponent(docid)}`);
     if (r.threads) THREADS = r.threads;
@@ -1266,11 +1266,11 @@ async function locateThread(t, retried) {
   if (fold) fold.open = true;               // 已解决的卡住在折叠里 — 翻开再滚
   const mark = document.querySelector(`mark.selmark[data-tid="${t.id}"]`);
   const target = mark || document.querySelector(`.block[data-i="${t.block}"]`) || card;
-  if (!target) { toast("⚠ 定位不到卡片 (块在但卡没渲)"); return; }
+  if (!target) { toast("⚠ Comment card is not rendered; the source block is still available"); return; }
   scrollSettle(target);
   syncActiveThread();
   flash(target);
-  if (!mark && (t.anchor || {}).sel) toast(`未找到 #${t.id.slice(2)} 的完整划词，已定位到原块；评论卡保留当时引文`);
+  if (!mark && (t.anchor || {}).sel) toast(`Full quotation for #${t.id.slice(2)} no longer matches. Showing its block; the original quote remains in the card.`);
   history.replaceState(null, "", "#" + t.id);
 }
 
@@ -1280,7 +1280,7 @@ function gotoHash() {
   if (!h || h === "diff") return;
   if (/^c-\d+$/.test(h)) {
     const t = THREADS.find(x => x.id === h);
-    t ? locateThread(t) : toast("⚠ 没有评论 #" + h.slice(2));
+    t ? locateThread(t) : toast("⚠ No comment #" + h.slice(2));
   } else if (h.startsWith("b-") && DOC) {
     const b = DOC.blocks.find(x => blockId(x) === h);
     if (b) {
@@ -1288,7 +1288,7 @@ function gotoHash() {
       revealBlock(b.i);
       const sec = document.querySelector(`.block[data-i="${b.i}"]`);
       if (sec) { scrollSettle(sec); flash(sec); }
-    } else toast("⚠ 没有这个块 (可能已被改写)");
+    } else toast("⚠ Block not found (it may have been rewritten)");
   }
 }
 addEventListener("hashchange", gotoHash);
@@ -1307,27 +1307,27 @@ $("submitBtn").onclick = async () => {
   const stage = $("stage");
   if (stage.hidden) {                       // 一段 staging: 先看清这批要发什么
     stage.hidden = false;
-    stage.innerHTML = `<div class="sthead">要提交这 ${ds.length + fds.length} 条 (提交后不可撤不可改):</div>` +
+    stage.innerHTML = `<div class="sthead">Submit ${ds.length + fds.length} item(s)? Sent items cannot be edited or withdrawn:</div>` +
       ds.map(t => `<div class="sitem"><b>#${t.id.slice(2)}</b> ${esc(oneLine(t))}</div>`).join("") +
       fds.map(({ t, u }) => `<div class="sitem"><b>#${t.id.slice(2)}↳</b> ${esc((u.text || "").split("\n")[0].slice(0, 90))}</div>`).join("");
     const row = document.createElement("div");
     row.className = "crow";
     const ok = document.createElement("button");
-    ok.textContent = "确认提交";
+    ok.textContent = "Confirm submission";
     ok.onclick = async () => {
       const r = await api("/api/submit", { doc: docid });
       if (r.ok) {
         const parts = [];
-        if (r.batch) parts.push(`批次 ${r.batch} (${r.ids.length} 条)`);
-        if (r.fids && r.fids.length) parts.push(`${r.fids.length} 条追问`);
-        toast(`已提交 ${parts.join(" + ")} — agent 侧会收到`);
+        if (r.batch) parts.push(`batch ${r.batch} (${r.ids.length} comments)`);
+        if (r.fids && r.fids.length) parts.push(`${r.fids.length} follow-ups`);
+        toast(`Submitted ${parts.join(" + ")} · delivered to the agent queue`);
       }
       stage.hidden = true;
       refresh(true);
     };
     const no = document.createElement("button");
     no.className = "ghost";
-    no.textContent = "再想想";
+    no.textContent = "Keep editing";
     no.onclick = () => { stage.hidden = true; };
     row.appendChild(ok); row.appendChild(no);
     stage.appendChild(row);
@@ -1344,7 +1344,7 @@ async function loadDoc() {
   ROUND = d.round;
   document.title = d.title + " · review-board";
   $("title").textContent = (d.emoji ? d.emoji + " " : "") + d.title;
-  if (FOCUS_THREAD) $("branchSource").textContent = "↩ 出自《" + d.title + "》";
+  if (FOCUS_THREAD) $("branchSource").textContent = "↩ From “" + d.title + "”";
   // 卫星出身反链 (registry born — 板侧元数据, 不进正文)
   const bornEl = $("born");
   if (d.born && d.born.doc) {
@@ -1356,7 +1356,7 @@ async function loadDoc() {
   const qEl = $("question");
   if (d.question) {
     qEl.hidden = false;
-    qEl.textContent = "❓ 本文回答的是: " +
+    qEl.textContent = "❓ Question: " +
       (d.question.length > 60 ? d.question.slice(0, 60) + "…" : d.question);
     qEl.title = d.question;
   } else qEl.hidden = true;
@@ -1373,15 +1373,15 @@ function setClaim(c) {
   el.hidden = false;
   if (!c) {
     el.className = "claim none";
-    el.textContent = "○ 无人值守";
-    el.title = `没有 session 在 wait 这份文档 — 评论会等到有人跑 boardctl wait --doc ${docid}`;
+    el.textContent = "○ No agent watching";
+    el.title = `No session is watching this document. An agent can run boardctl wait --doc ${docid}.`;
     return;
   }
   el.className = "claim " + (c.alive ? "alive" : "dead");
-  el.textContent = `${c.alive ? "●" : "○"} 值守 ${c.name} · ${(c.sid || "").slice(0, 8)} · ${c.host} · ${c.cwd}` +
-    (c.alive ? ` · 心跳 ${c.beat_ago}s 前` : " · 失联");
+  el.textContent = `${c.alive ? "●" : "○"} Watching ${c.name} · ${(c.sid || "").slice(0, 8)} · ${c.host} · ${c.cwd}` +
+    (c.alive ? ` · heartbeat ${c.beat_ago}s ago` : " · Disconnected");
   el.title = c.alive ? `resume: claude --resume ${c.sid}   (SendMessage ${c.name})`
-    : `值守进程不在了 (最后心跳 ${c.beat_ago}s 前) — 要人重新 wait`;
+    : `Watcher disconnected (last heartbeat ${c.beat_ago}s ago); start wait again`;
 }
 
 /* ---------- v2.3 F3: 覆盖率 chip + 未看块标记 (沉默 = 没看) ---------- */
@@ -1392,10 +1392,10 @@ function setCoverage(cov) {
   if (!cov || !cov.n_total) { el.hidden = true; return; }
   el.hidden = false;
   const all = cov.n_seen >= cov.n_total;
-  el.textContent = `看过 ${cov.n_seen}/${cov.n_total}${all ? " ✓" : ""}`;
+  el.textContent = `Read ${cov.n_seen}/${cov.n_total}${all ? " ✓" : ""}`;
   el.className = "cov" + (all ? " all" : "");
-  el.title = all ? "这版每一块都看过了 (评论过 / 看完了 / 批准过 = 看过)"
-    : "点一下跳到第一块没看的 · 评论过 / 看完了 / 批准过 = 看过; 我改写过的块会回到未看";
+  el.title = all ? "All blocks in this version have been read, commented on, or approved"
+    : "Jump to the first unread block. Comments, read marks and approval count as read; revised blocks become unread.";
   syncUnseen();
 }
 function syncUnseen() {
@@ -1426,12 +1426,12 @@ async function refresh(force) {
 async function bootReadonly() {
   document.body.classList.add("readonly");
   const d = await api(`/api/answerdoc/${encodeURIComponent(docid)}/${XREL}`);
-  if (!d.blocks) { $("title").textContent = "取不到外链答案"; return; }
+  if (!d.blocks) { $("title").textContent = "Linked answer unavailable"; return; }
   const rel = decodeURIComponent(XREL);
   const dir = rel.includes("/") ? rel.slice(0, rel.lastIndexOf("/") + 1) : "";
   ASSET_BASE = `/api/asset/${encodeURIComponent(docid)}/` + dir;
   document.title = rel + " · review-board";
-  $("title").innerHTML = `<a href="/d/${encodeURIComponent(docid)}">◀ 回 ${esc(docid)}</a> · ${esc(rel)} <span class="hint">(外链答案 · 只读)</span>`;
+  $("title").innerHTML = `<a href="/d/${encodeURIComponent(docid)}">◀ Back to ${esc(docid)}</a> · ${esc(rel)} <span class="hint">(linked answer · read only)</span>`;
   DOC = { blocks: d.blocks, causes: [] };
   ROUND = null;
   renderBlocks();
@@ -1440,8 +1440,8 @@ async function bootReadonly() {
 /* ---------- v2.4 F14: 文档内搜索 (折叠卡+外链答案吃掉 ⌘F) ---------- */
 
 function renderHits(box, hits, q) {
-  box.innerHTML = hits.length ? "" : '<div class="hint">没搜到</div>';
-  const KL = { block: "正文", comment: "评论", answer: "答案", question: "❓" };
+  box.innerHTML = hits.length ? "" : '<div class="hint">No results</div>';
+  const KL = { block: "Content", comment: "Comment", answer: "Answer", question: "❓" };
   for (const h of hits) {
     const a = document.createElement("a");
     a.className = "srow";
@@ -1478,7 +1478,7 @@ function initMeta() {
     const r = await api("/api/meta", { doc: docid, emoji: $("me_emoji").value.trim(),
                                        color: $("me_color").value });
     if (r.ok) {
-      toast("已改 — favicon 一起换了");
+      toast("Saved · favicon updated");
       $("metaedit").hidden = true;
       $("fav").href = "/favicon.svg?doc=" + encodeURIComponent(docid) + "&t=" + Date.now();
       refresh(true);
@@ -1498,7 +1498,7 @@ function initSearch() {
     try {
       const r = await fetch(`/api/search?q=${encodeURIComponent(q)}&doc=${encodeURIComponent(docid)}`);
       renderHits(res, (await r.json()).hits || [], q);
-    } catch (e) { res.innerHTML = '<div class="hint">搜索失败</div>'; }
+    } catch (e) { res.innerHTML = '<div class="hint">Search failed</div>'; }
   }
 }
 
@@ -1536,7 +1536,7 @@ function initSearch() {
     if (ROUND && ROUND.status === "answered") { openComposer(null, null, "approve"); return; }
     if (!DOC) return;
     const r = await api("/api/seen", { doc: docid, rev: DOC.sha });
-    if (r.ok) toast(`看完了 — ${r.n_seen}/${r.n_total} 块记为看过`);
+    if (r.ok) toast(`Marked as read · ${r.n_seen}/${r.n_total} blocks`);
     refresh(true);
   };
   $("noteBtn").onclick = () => openComposer(null, null, "note");

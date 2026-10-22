@@ -160,7 +160,7 @@ class Handler(BaseHTTPRequestHandler):
         if docid not in reg:
             return self._send(404, {"err": "doc"})
         if not rel.endswith(".md"):
-            return self._send(400, {"err": "md only — 其他资源走 /api/asset"})
+            return self._send(400, {"err": "Markdown only; use /api/asset for other resources"})
         base = os.path.dirname(os.path.realpath(reg[docid]["path"]))
         full = os.path.realpath(os.path.join(base, rel))
         if full != base and not full.startswith(base + os.sep):
@@ -220,7 +220,7 @@ class Handler(BaseHTTPRequestHandler):
         q = (self.q.get("q") or [""])[0]
         doc = (self.q.get("doc") or [""])[0] or None
         if len(lib.search_norm(q)) < 2:
-            return self._send(400, {"err": "至少 2 个字符"})
+            return self._send(400, {"err": "Enter at least 2 characters"})
         return self._send(200, {"q": q, "hits": lib.search(q, doc)})
 
     def _favicon(self):
@@ -394,7 +394,7 @@ class Handler(BaseHTTPRequestHandler):
             # v2.3: 缺省基线 = 最后一次人类发言的 rev (无回合的纯即发文档也有改动页)
             a = lib.baseline_rev(lib.all_events(p)) or ""
             if not a:
-                return self._send(409, {"err": "还没有基线 — 你还没在这份文档上发过言"})
+                return self._send(409, {"err": "No baseline yet; submit a comment or mark this document as read first"})
         if a.startswith("round:"):
             r = next((x for x in rounds if str(x["batch"]) == a[6:]), None)
             if r is None:
@@ -403,7 +403,7 @@ class Handler(BaseHTTPRequestHandler):
                                            (r["approve_rev"] or r["rev_after"] or "now"))
         ab = lib.snapshot_blocks(docid, a)
         if ab is None:
-            return self._send(409, {"err": "旧版快照不在了 (只损失回看, 不影响决定)"})
+            return self._send(409, {"err": "Previous snapshot missing; historical display is unavailable, decisions are preserved"})
         if b in ("now", "", None):
             md = lib.read_doc(p)
             bb = lib.split_blocks(md) if md is not None else []
@@ -411,7 +411,7 @@ class Handler(BaseHTTPRequestHandler):
         else:
             bb = lib.snapshot_blocks(docid, b)
             if bb is None:
-                return self._send(409, {"err": "该版快照不在了"})
+                return self._send(409, {"err": "Snapshot for this version is unavailable"})
         ops = []
         for op in lib.diff_blocks(ab, bb):
             o = dict(op)
@@ -488,7 +488,7 @@ class Handler(BaseHTTPRequestHandler):
                 ths, _ = lib.fold_threads(doc_path)
                 th = next((t for t in ths if t["id"] == cid), None)
                 if not th or th["status"] == "draft" or th["kind"] == "note":
-                    return self._send(409, {"err": "只能展开已提交的评论"})
+                    return self._send(409, {"err": "Only delivered comments can become exploration branches"})
                 if th.get("intent") != "explore":
                     lib.append_event(cpath, {"type": "explore", "re": cid, "ts": lib.now_ts()})
             return self._send(200, {"ok": True, "id": cid})
@@ -517,7 +517,7 @@ class Handler(BaseHTTPRequestHandler):
             if th is None:
                 return self._send(409, {"err": "unknown id"})
             if th["status"] == "draft":
-                return self._send(409, {"err": "草稿还没送达, 直接改它就行"})
+                return self._send(409, {"err": "This draft has not been delivered; edit the draft directly"})
             sha = lib.ensure_rev(doc_path, docid, cpath, "followup", "server")
             fid = lib.next_id(lib.read_events(cpath), "f")
             ev = {"type": "followup", "id": fid, "re": cid, "ts": lib.now_ts(),
@@ -539,14 +539,14 @@ class Handler(BaseHTTPRequestHandler):
                 if turn is None:
                     return self._send(409, {"err": "unknown id"})
                 if not turn.get("draft"):
-                    return self._send(409, {"err": "已送达, 不能改/撤 — 请再追问一条"})
+                    return self._send(409, {"err": "Already delivered; add a follow-up instead of editing or withdrawing it"})
             else:
                 th = next((t for t in ths if t["id"] == cid), None)
                 if th is None:
                     return self._send(409, {"err": "unknown id"})
                 if th["status"] != "draft":
                     # 已提交的发言不可撤不可改 (契约 v1)
-                    return self._send(409, {"err": "已提交, 不能改/撤 — 请新开一条评论"})
+                    return self._send(409, {"err": "Already submitted; add a new comment instead of editing or withdrawing it"})
             if path.endswith("edit"):
                 text = (body.get("text") or "").strip()
                 if not text:
@@ -585,10 +585,10 @@ class Handler(BaseHTTPRequestHandler):
             em = (body.get("emoji") or "").strip()
             col = (body.get("color") or "").strip()
             if col and not re.match(r"^#[0-9a-fA-F]{6}$", col):
-                return self._send(400, {"err": "颜色要 #RRGGBB"})
+                return self._send(400, {"err": "Color must use #RRGGBB"})
             if em:
                 if len(em) > 8:
-                    return self._send(400, {"err": "emoji 太长"})
+                    return self._send(400, {"err": "Emoji is too long"})
                 reg[docid]["emoji"] = em
             if col:
                 reg[docid]["color"] = col
@@ -603,7 +603,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(500, {"err": "unreadable"})
             cur = lib.doc_sha(md)
             if body.get("rev") and body["rev"] != cur:
-                return self._send(409, {"err": "文档刚变了 — 页面已刷新, 看一眼再点"})
+                return self._send(409, {"err": "The document changed; review the refreshed version and try again"})
             sha = lib.ensure_rev(doc_path, docid, cpath, "seen", "server")
             blocks = lib.split_blocks(md)
             lib.append_event(cpath, {"type": "seen", "ts": lib.now_ts(), "rev": sha,
@@ -615,7 +615,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/approve":
             rounds = lib.fold_rounds(doc_path)
             if not rounds:
-                return self._send(409, {"err": "还没有回合"})
+                return self._send(409, {"err": "No review round yet"})
             batch = body.get("batch") or rounds[-1]["batch"]
             r = next((x for x in rounds if x["batch"] == batch), None)
             if r is None:
@@ -634,7 +634,7 @@ class Handler(BaseHTTPRequestHandler):
             # ⇒ pending/wait/answer 整条唤醒链零改动复用 (契约 v1)
             note = (body.get("note") or "").strip()
             if not note:
-                return self._send(400, {"err": "打回要写一行理由"})
+                return self._send(400, {"err": "Please explain what needs to change"})
             ths, nbatch = lib.fold_threads(doc_path)
             drafts = [t["id"] for t in ths if t["status"] == "draft"]
             rounds = lib.fold_rounds(doc_path)
@@ -645,7 +645,7 @@ class Handler(BaseHTTPRequestHandler):
             lib.append_event(cpath, {
                 "type": "comment", "id": cid, "ts": now, "author": "Reviewer",
                 "kind": "reject", "re_batch": batch, "anchor": {"rev": sha},
-                "text": "【打回第 %s 回合】%s" % (batch, note),
+                "text": "[Changes requested for round %s] %s" % (batch, note),
             })
             lib.append_event(cpath, {"type": "submit", "batch": nbatch + 1,
                                      "ts": now + 0.001, "ids": drafts + [cid]})
