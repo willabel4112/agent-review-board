@@ -6,18 +6,54 @@ A local Markdown review surface for a human working with a coding agent. Select 
 passage, ask a question, follow up in its thread, and inspect what changed in the
 document. Your existing agent answers through a CLI; the board does not call a model.
 
+[![Checks](https://github.com/willabel4112/agent-review-board/actions/workflows/checks.yml/badge.svg)](https://github.com/willabel4112/agent-review-board/actions/workflows/checks.yml)
+[Latest release: v0.2.1](https://github.com/willabel4112/agent-review-board/releases/tag/v0.2.1)
+· [Windows setup](docs/WINDOWS.md) · [Usage guide](docs/USAGE.md) · [Agent instructions](AGENTS.md)
+
+**Runs locally on Windows, macOS and Linux.** The interface and CLI are in English.
+The server uses the Python standard library; browser dependencies are vendored.
+No model API key or additional Python packages are needed.
+
+| Platform | Requirements | Optional resident service |
+|---|---|---|
+| Windows | Native Python 3.11+; PowerShell 5.1+ for the installer | Per-user Task Scheduler task, after login |
+| macOS | Python 3.10+ | Per-user launchd service |
+| Linux | Python 3.10+ | Per-user systemd service |
+
+The public package covers one machine: documents, agent and board run together.
+Cross-machine access and configuration are outside this release's scope.
+
 ![A synthetic review in the actual application](docs/assets/review-en.jpg)
 
-This package includes an English interface and CLI, a usage guide, and synthetic
-examples. It runs locally on **Windows, macOS and Linux**. Python 3.10+ is required
-on macOS/Linux, and native Python 3.11+ on Windows. The server uses the standard
-library. Browser dependencies are vendored.
+## What's new
+
+- **Native Windows support:** Unicode paths, a `.cmd` CLI launcher, and an optional
+  installer with install, start, status, stop and uninstall actions. No WSL needed.
+- **Visible batch confirmation:** a centered dialog stays visible with the sidebar
+  hidden, shows progress and errors, and keeps the list available for retry.
+- **Reliable local startup:** no reverse-DNS lookup is needed to start the server.
+
+The release passed native Windows testing and five CI jobs across Windows,
+macOS and Linux. See [release notes](CHANGELOG.md) for the changes and test scope.
 
 ## Try the disposable demo
+
+Clone the repository with Git:
 
 ```sh
 git clone https://github.com/willabel4112/agent-review-board.git
 cd agent-review-board
+```
+
+**Windows — PowerShell:**
+
+```powershell
+py -3 -X utf8 examples\demo.py
+```
+
+**macOS / Linux:**
+
+```sh
 python3 examples/demo.py
 ```
 
@@ -26,18 +62,16 @@ comments, a document revision, and a child document. You can add comments and
 explore branches. It uses a temporary directory and a random port; Ctrl-C removes
 its data. Replies are seeded examples, not automatic AI responses.
 
-On Windows, use PowerShell with native Python (WSL is unnecessary):
+## Review your own document
+
+**Windows — PowerShell:**
 
 ```powershell
-git clone https://github.com/willabel4112/agent-review-board.git
-cd agent-review-board
-py -3 -X utf8 examples\demo.py
+py -3 -X utf8 boardctl.py register 'C:\My documents\plan.md' --id plan --title 'Project plan'
+py -3 -X utf8 server.py
 ```
 
-See [Windows setup](docs/WINDOWS.md) for document registration, the CLI, and an
-optional service that starts after you log in.
-
-## Review your own document
+**macOS / Linux:**
 
 ```sh
 python3 boardctl.py register /absolute/path/plan.md --id plan --title "Project plan"
@@ -46,13 +80,21 @@ python3 server.py
 
 Open `http://127.0.0.1:8798/d/plan`. In another terminal, or through your agent:
 
+```powershell
+# Windows
+.\bin\boardctl.cmd pending --doc plan --json
+.\bin\boardctl.cmd reply plan c-0001 --file answer.md --summary 'The short conclusion'
+```
+
 ```sh
+# macOS / Linux
 python3 boardctl.py pending --doc plan --json
 python3 boardctl.py reply plan c-0001 --file answer.md --summary "The short conclusion"
 ```
 
 For a requested change, the agent edits the source Markdown, commits that change
-in its repository, then associates the result with the comment:
+in its repository, then associates the result with the comment (use
+`.\bin\boardctl.cmd` in place of `python3 boardctl.py` on Windows):
 
 ```sh
 python3 boardctl.py answer-edit plan c-0001 --commit COMMIT_SHA --summary "Updated the acceptance criteria"
@@ -63,6 +105,8 @@ when a thread is resolved or a reviewed version is approved.
 
 Give your agent [the workflow instructions](AGENTS.md). See [the full usage guide](docs/USAGE.md)
 for session identity, waiting, child documents, storage and service installation.
+On Windows, [the setup guide](docs/WINDOWS.md) also covers interpreter selection,
+shared CLI/service state and optional startup after login.
 
 ## Why this exists
 
@@ -117,12 +161,13 @@ sharing a document repository.
 
 This release includes no original registry, comments, snapshots, session history,
 network inventories or production screenshots. See [publication notes](docs/PUBLICATION.md).
-The public package supports a board on the machine where its documents and agent
-run. Cross-machine access, peer directories, SSH forwarding and remote PIN setup
-are outside its scope. The old tunnel helper and peer homepage have been removed;
-an existing `peers.local.json` is ignored.
+The old tunnel helper and peer homepage have been removed; an existing
+`peers.local.json` is ignored. Remote PIN setup and machine-specific network
+configuration are not included.
 
 ## Check the implementation
+
+On macOS/Linux:
 
 ```sh
 python3 tests/test_lib.py
@@ -137,6 +182,7 @@ node tests/test_batch.js
 Node is only needed for the JavaScript tests. [Architecture](ARCHITECTURE.md) explains
 the storage model and invariants. [Release notes](CHANGELOG.md) distinguish the
 working feature set from changes made for this public package.
+Windows users can run the [PowerShell test commands](docs/WINDOWS.md#run-checks-without-installing).
 
 MIT for original code and documentation; vendored dependencies retain their own
 licenses in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
