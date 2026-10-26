@@ -12,7 +12,8 @@ import posixpath
 import time
 import threading
 import urllib.parse
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer as _ThreadingHTTPServer
+from socketserver import TCPServer
 
 import board_lib as lib
 
@@ -26,6 +27,14 @@ ASSET_TYPES = {
     "html": "text/html; charset=utf-8", "pdf": "application/pdf",
     "md": "text/plain; charset=utf-8", "txt": "text/plain; charset=utf-8",
 }
+
+
+class ThreadingHTTPServer(_ThreadingHTTPServer):
+    """Local serving does not need a reverse-DNS lookup during startup."""
+
+    def server_bind(self):
+        TCPServer.server_bind(self)
+        self.server_name, self.server_port = self.server_address[:2]
 
 
 def _round_brief(r):

@@ -44,7 +44,8 @@ class PublicPackage(unittest.TestCase):
         try:
             with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {'RB_HOST': 'demo'}):
                 seed(temp)
-                srv = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+                with patch('socket.getfqdn', side_effect=AssertionError('Local startup must not need DNS')):
+                    srv = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
                 thread = threading.Thread(target=srv.serve_forever, daemon=True)
                 thread.start()
                 base = f'http://127.0.0.1:{srv.server_port}'
