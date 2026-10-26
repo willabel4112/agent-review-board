@@ -1,5 +1,11 @@
 # Release notes
 
+## 0.2.1 — Windows runner path compatibility
+
+- Normalize synthetic test paths before comparing CLI output. Windows runners
+  can expose the same temporary directory as both an 8.3 alias and a long path.
+  Application behavior and the Windows installer are unchanged from 0.2.0.
+
 ## 0.2.0 — Native Windows and local review updates
 
 - Add native Windows support: whole-file event locks, cooperative readers,

@@ -76,7 +76,7 @@ def _kernel_probe(path, connection):
 class PlatformTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="review-board-中文 空格-")
-        self.root = Path(self.temp.name)
+        self.root = Path(self.temp.name).resolve()
         self.path = self.root / "合成 events.jsonl"
         self.context = multiprocessing.get_context("spawn")
         self.processes = []
@@ -274,7 +274,8 @@ print(json.dumps([b.ROOT, b.DATA_ROOT]))
 class CliTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory(prefix="review-board-cli-中文 空格-")
-        self.root = Path(self.temp.name)
+        # Windows runners may give TEMP an 8.3 alias; the CLI prints realpath.
+        self.root = Path(self.temp.name).resolve()
         self.source = self.root / "源码 source"
         self.source.mkdir()
         for name in ("board_lib.py", "boardctl.py", "board_platform.py", "server.py"):
