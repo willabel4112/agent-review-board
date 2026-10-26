@@ -9,3 +9,5 @@ logs/
 *.comments.jsonl
 *.replies.jsonl
 .demo/
+windows-service.json
+windows-service.json.*

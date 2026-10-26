@@ -17,6 +17,8 @@ agent editor -> document.md -> version snapshots and block diffs
 | `board_lib.py` | Blocks, anchors, diff, snapshots, event folding, registry, claims and exploration projection |
 | `server.py` | Loopback HTTP; rendering data and human comment events |
 | `boardctl.py` | Agent-facing CLI; replies and edit associations |
+| `board_platform.py` | POSIX/Windows event-file locks, safe PID probes, atomic replacement, foreground service logging |
+| `install.ps1` / `bin/boardctl.cmd` | Optional Windows per-user task and native CLI launcher |
 | `static/app.js` | Document rendering, selection, threads, review rounds and incremental polling |
 | `static/navigation.js` | Pure heading, fold, navigation and follow-up helpers |
 | `static/explore.js` | Document family tree and same-origin iframe reading stack |
@@ -59,3 +61,15 @@ private machine inventory or a harness session registry. Claims are local,
 process-bound coordination, not a multi-user distributed lock. The original
 service templates are retained under a generic public label; installation is
 optional and the disposable demo does not install a service.
+
+Windows uses `LockFileEx` over the event file's full byte range, including empty
+files and future growth. Readers cooperate with shared locks; POSIX retains
+`flock` compatibility. PID checks use read-only process handles on Windows.
+State and snapshots use closed, unique temporary files in the destination
+directory before atomic replacement. Imports do not create state directories.
+
+The public package has no peer directory, remote authentication or forwarding
+helper. Its server binds to loopback and its CLI accesses local files. Windows
+Task Scheduler runs the foreground server as the installing user after login;
+the installer checks the task owner/action before managing it. It neither saves
+an account password nor configures network access.

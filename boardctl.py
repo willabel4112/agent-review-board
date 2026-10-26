@@ -9,6 +9,7 @@ import json
 import os
 import sys
 import time
+from urllib.parse import quote
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import board_lib as lib  # noqa: E402
@@ -22,6 +23,8 @@ def cmd_register(a):
         sys.exit("no such file: %s" % p)
     reg = lib.load_registry()
     docid = a.id or os.path.splitext(os.path.basename(p))[0].lower()
+    if not lib.valid_docid(docid):
+        sys.exit("invalid document id: use a single safe path component")
     base, k = docid, 2
     while docid in reg and reg[docid]["path"] != p:
         docid = "%s-%d" % (base, k)
@@ -47,7 +50,7 @@ def cmd_register(a):
     reg[docid] = entry
     lib.save_registry(reg)
     print("registered %s -> %s" % (docid, p))
-    print("%s/d/%s" % (URL, docid))
+    print("%s/d/%s" % (URL, quote(docid, safe="")))
 
 
 def cmd_archive(a):
@@ -435,6 +438,9 @@ def cmd_drafts(a):
 
 
 def main():
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, "reconfigure"):
+            stream.reconfigure(encoding="utf-8")
     ap = argparse.ArgumentParser(prog="boardctl")
     sub = ap.add_subparsers(dest="cmd", required=True)
 

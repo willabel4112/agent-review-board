@@ -8,10 +8,10 @@ document. Your existing agent answers through a CLI; the board does not call a m
 
 ![A synthetic review in the actual application](docs/assets/review-en.jpg)
 
-Derived from the working v2.7 implementation, this package includes an English
-interface and CLI, a usage guide, and synthetic examples. macOS and Linux are
-supported. Python 3.10+ is required;
-the server uses the standard library. Browser dependencies are vendored.
+This package includes an English interface and CLI, a usage guide, and synthetic
+examples. It runs locally on **Windows, macOS and Linux**. Python 3.10+ is required
+on macOS/Linux, and native Python 3.11+ on Windows. The server uses the standard
+library. Browser dependencies are vendored.
 
 ## Try the disposable demo
 
@@ -25,6 +25,17 @@ Open the printed loopback URL. The demo contains a synthetic research plan,
 comments, a document revision, and a child document. You can add comments and
 explore branches. It uses a temporary directory and a random port; Ctrl-C removes
 its data. Replies are seeded examples, not automatic AI responses.
+
+On Windows, use PowerShell with native Python (WSL is unnecessary):
+
+```powershell
+git clone https://github.com/willabel4112/agent-review-board.git
+cd agent-review-board
+py -3 -X utf8 examples\demo.py
+```
+
+See [Windows setup](docs/WINDOWS.md) for document registration, the CLI, and an
+optional service that starts after you log in.
 
 ## Review your own document
 
@@ -106,6 +117,10 @@ sharing a document repository.
 
 This release includes no original registry, comments, snapshots, session history,
 network inventories or production screenshots. See [publication notes](docs/PUBLICATION.md).
+The public package supports a board on the machine where its documents and agent
+run. Cross-machine access, peer directories, SSH forwarding and remote PIN setup
+are outside its scope. The old tunnel helper and peer homepage have been removed;
+an existing `peers.local.json` is ignored.
 
 ## Check the implementation
 
@@ -113,7 +128,10 @@ network inventories or production screenshots. See [publication notes](docs/PUBL
 python3 tests/test_lib.py
 python3 tests/test_explore.py
 python3 tests/test_public.py
+RB_TEST_HTTP=1 python3 tests/test_platform.py
+python3 tests/test_snapshot_boundary.py
 node tests/test_navigation.js
+node tests/test_batch.js
 ```
 
 Node is only needed for the JavaScript tests. [Architecture](ARCHITECTURE.md) explains

@@ -4,10 +4,20 @@ permissions:
   contents: read
 jobs:
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
-        python: ['3.10', '3.13']
+        include:
+          - {os: ubuntu-latest, python: '3.10'}
+          - {os: ubuntu-latest, python: '3.13'}
+          - {os: macos-latest, python: '3.13'}
+          - {os: windows-latest, python: '3.11'}
+          - {os: windows-latest, python: '3.13'}
+    env:
+      PYTHONUTF8: '1'
+      PYTHONIOENCODING: utf-8
+      RB_TEST_HTTP: '1'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -19,4 +29,7 @@ jobs:
       - run: python tests/test_lib.py
       - run: python tests/test_explore.py
       - run: python tests/test_public.py
+      - run: python tests/test_platform.py
+      - run: python tests/test_snapshot_boundary.py
       - run: node tests/test_navigation.js
+      - run: node tests/test_batch.js

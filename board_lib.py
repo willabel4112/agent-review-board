@@ -5,25 +5,26 @@
 只 append sidecar + 写内容寻址快照缓存 — 渲染层永不改源 md 字节.
 """
 import difflib
-import fcntl
 import hashlib
 import json
 import os
 import re
 import sys
 import time
+import tempfile
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-DATA_ROOT = os.path.abspath(os.environ.get("RB_DATA_DIR", ROOT))
-os.makedirs(DATA_ROOT, exist_ok=True)
-# v2.2 multi-machine support: registry = 机器本地状态 (gitignored)。in-repo 追踪是单机时代的决定 —
-# 多机各自注册文档后 in-repo 必冲突 (remote-workstation 实证 6+ 份本地文档)。旧 clone 首次 load 自迁移。
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+from board_platform import DEFAULT_LOCK_TIMEOUT, file_lock, pid_alive, replace_file
+
+DATA_ROOT = os.path.abspath(os.path.expanduser(os.environ.get("RB_DATA_DIR") or ROOT))
+# Registry, snapshots and process claims are local to this installation.
 REGISTRY = os.path.join(DATA_ROOT, "registry.local.json")
 _LEGACY_REGISTRY = os.path.join(DATA_ROOT, "registry.json")
 SNAPDIR = os.path.join(DATA_ROOT, ".snapshots")
-# v2.3: 认领 / 联合首页 都是机器本地状态 (gitignored) — 活状态不是决定, 不进 sidecar
+# Claims are live local state, separate from review events.
 CLAIMS = os.path.join(DATA_ROOT, "claims.local.json")
-PEERS = os.path.join(DATA_ROOT, "peers.local.json")
 SESSIONS_DIR = ""  # No private harness registry is consulted.
 CLAIM_TTL = 90.0      # 心跳超过它且 pid 不在 = 认领作废
 
@@ -71,10 +72,7 @@ def load_registry():
 
 
 def save_registry(reg):
-    tmp = REGISTRY + ".tmp"
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(reg, f, ensure_ascii=False, indent=2)
-    os.replace(tmp, REGISTRY)
+    _save_json(REGISTRY, reg)
 
 
 # ---------- block parsing ----------
@@ -264,28 +262,46 @@ def read_doc(path):
         return None
 
 
+def valid_docid(docid):
+    return (isinstance(docid, str) and 0 < len(docid) <= 255
+            and docid not in (".", "..") and docid == docid.rstrip(" .")
+            and not re.search(r'[\x00-\x1f<>:"/\\|?*]', docid)
+            and not re.match(r'(?i)^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)', docid))
+
+
+
+def _snapshot_path(docid, sha):
+    if not valid_docid(docid) or not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{12}", sha):
+        return None
+    root = os.path.realpath(SNAPDIR)
+    path = os.path.realpath(os.path.join(root, docid, sha + ".md"))
+    try:
+        return path if os.path.normcase(os.path.commonpath([root, path])) == os.path.normcase(root) else None
+    except ValueError:
+        return None
+
+
+
 def snapshot_put(docid, text):
     """内容寻址快照 (缓存, 非第二真源): 按自身哈希命名 ⇒ 不可能与真源分歧."""
     sha = doc_sha(text)
-    d = os.path.join(SNAPDIR, docid)
-    p = os.path.join(d, sha + ".md")
+    p = _snapshot_path(docid, sha)
+    if p is None:
+        raise ValueError("invalid or escaping snapshot path")
     if not os.path.exists(p):
-        os.makedirs(d, exist_ok=True)
-        tmp = "%s.%d.tmp" % (p, os.getpid())
-        with open(tmp, "w", encoding="utf-8") as f:
-            f.write(text)
-        os.replace(tmp, p)
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+        _atomic_text(p, text)
     return sha
 
 
 def snapshot_get(docid, sha):
-    if not sha:
-        return None
-    p = os.path.join(SNAPDIR, docid, sha + ".md")
-    return read_doc(p) if os.path.isfile(p) else None
+    p = _snapshot_path(docid, sha)
+    return read_doc(p) if p is not None and os.path.isfile(p) else None
 
 
 def snapshot_blocks(docid, sha):
+    if _snapshot_path(docid, sha) is None:
+        return None
     hit = _SNAP_MEMO.get((docid, sha))
     if hit is not None:
         return hit
@@ -389,7 +405,7 @@ def read_events(path):
         # 与"坏行跳过"同一容错原则: 一篇文档不该炸掉全板 fold (pending/wait 全体阵亡)
         print(f"[board_lib] warn: unreadable sidecar {path}: {e}", file=sys.stderr)
         return []
-    with f:
+    with f, file_lock(f, exclusive=False):
         for line in f:
             line = line.strip()
             if line:
@@ -401,13 +417,18 @@ def read_events(path):
     return out
 
 
-def append_event(path, ev):
-    line = json.dumps(ev, ensure_ascii=False)
-    with open(path, "a", encoding="utf-8") as f:
-        fcntl.flock(f, fcntl.LOCK_EX)
-        f.write(line + "\n")
-        f.flush()
-        fcntl.flock(f, fcntl.LOCK_UN)
+def append_event(path, ev, *, timeout=DEFAULT_LOCK_TIMEOUT):
+    line = (json.dumps(ev, ensure_ascii=False) + "\n").encode("utf-8")
+    # Unbuffered IO avoids a close-time retry flushing bytes after lock release
+    # if a write fails. Short writes are completed while the lock is still held.
+    with open(path, "ab", buffering=0) as f:
+        with file_lock(f, timeout=timeout):
+            rest = memoryview(line)
+            while rest:
+                written = f.write(rest)
+                if not written:
+                    raise OSError("event-file write made no progress")
+                rest = rest[written:]
 
 
 def next_id(evs, prefix):
@@ -691,11 +712,24 @@ def _load_json(p, dflt):
         return dflt
 
 
+def _atomic_text(p, text):
+    parent = os.path.dirname(os.path.abspath(p))
+    os.makedirs(parent, exist_ok=True)
+    tmp = None
+    try:
+        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", newline="\n",
+                                         dir=parent, suffix=".tmp", delete=False) as f:
+            tmp = f.name
+            f.write(text)
+        replace_file(tmp, p)
+    finally:
+        if tmp is not None and os.path.exists(tmp):
+            os.unlink(tmp)
+
+
+
 def _save_json(p, obj):
-    tmp = "%s.%d.tmp" % (p, os.getpid())
-    with open(tmp, "w", encoding="utf-8") as f:
-        json.dump(obj, f, ensure_ascii=False, indent=2)
-    os.replace(tmp, p)
+    _atomic_text(p, json.dumps(obj, ensure_ascii=False, indent=2))
 
 
 def load_claims():
@@ -706,23 +740,10 @@ def save_claims(c):
     _save_json(CLAIMS, c)
 
 
-def load_peers():
-    ps = _load_json(PEERS, [])
-    return [p for p in ps if isinstance(p, dict) and p.get("url")]
-
-
 def machine_name():
     """Optional display alias, otherwise the local short hostname."""
     import platform
     return os.environ.get("RB_HOST") or platform.node().split(".")[0]
-
-
-def pid_alive(pid):
-    try:
-        os.kill(int(pid), 0)
-        return True
-    except (OSError, ValueError, TypeError):
-        return False
 
 
 def claim_alive(c, now=None):

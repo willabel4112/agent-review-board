@@ -17,7 +17,6 @@ def seed(root):
     lib.REGISTRY = str(root / "registry.json")
     lib._LEGACY_REGISTRY = str(root / "no-legacy.json")
     lib.CLAIMS = str(root / "claims.json")
-    lib.PEERS = str(root / "peers.json")
     lib.SNAPDIR = str(root / "snapshots")
     lib.SESSIONS_DIR = str(root / "no-sessions")
     doc = root / "demo.md"

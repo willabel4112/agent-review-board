@@ -9,6 +9,8 @@ import tempfile
 import threading
 import unittest
 from unittest.mock import patch
+from urllib.error import HTTPError
+from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -37,7 +39,7 @@ class PublicPackage(unittest.TestCase):
                 self.assertEqual(lib.sessions_index(), {})
 
     def test_real_cli_and_http_share_isolated_state(self):
-        names = ('REGISTRY', '_LEGACY_REGISTRY', 'CLAIMS', 'PEERS', 'SNAPDIR')
+        names = ('REGISTRY', '_LEGACY_REGISTRY', 'CLAIMS', 'SNAPDIR')
         saved = {name: getattr(lib, name) for name in names}
         try:
             with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {'RB_HOST': 'demo'}):
@@ -78,6 +80,13 @@ class PublicPackage(unittest.TestCase):
                     for text, extra in [('draft only', {}), ('private note', {'kind': 'note'}),
                                         ('delivered question', {'send': True})]:
                         request('/api/comment', {'doc': 'research', 'text': text, **extra})
+                    # Old peer files are inert; the local server exposes no peer API.
+                    (Path(temp)/'peers.local.json').write_text(
+                        '[{"name":"retired","url":"http://127.0.0.1:1"}]', encoding='utf-8')
+                    with self.assertRaises(HTTPError) as retired:
+                        request('/api/peers')
+                    self.assertEqual(retired.exception.code, 404)
+                    retired.exception.close()
                     pending = json.loads(cli('pending', '--doc', 'research', '--json'))
                     self.assertEqual([p['text'] for p in pending], ['delivered question'])
                     cid = pending[0]['id']
@@ -90,6 +99,20 @@ class PublicPackage(unittest.TestCase):
                     self.assertEqual(answered['replies'][-1]['author'], 'Test agent')
                     self.assertEqual(answered['replies'][-1]['session'], 'synthetic-session')
                     self.assertEqual((Path(temp)/'research-plan.md').read_bytes(), before)
+                    # A Unicode ID must work through all encoded browser routes.
+                    uid = '中文 文档'
+                    cli('register', str(Path(temp)/'sampling.md'), '--id', uid)
+                    for route in ('doc', 'threads', 'rounds', 'revs', 'explore'):
+                        request('/api/' + route + '/' + quote(uid, safe=''))
+                    asset = Path(temp)/'资料 百分%.md'
+                    asset.write_text('# UTF-8 asset\n', encoding='utf-8')
+                    result = request('/api/answerdoc/' + quote(uid, safe='') + '/' + quote(asset.name))
+                    self.assertEqual(result['blocks'][0]['md'], '# UTF-8 asset')
+                    for path in ('../outside.md', 'C:stream.md', 'file.md:ads.md', r'..\outside.md'):
+                        with self.assertRaises(HTTPError) as escaped:
+                            request('/api/answerdoc/' + quote(uid, safe='') + '/' + quote(path, safe=''))
+                        self.assertEqual(escaped.exception.code, 403)
+                        escaped.exception.close()
                 finally:
                     srv.shutdown()
                     srv.server_close()

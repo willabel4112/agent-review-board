@@ -21,6 +21,8 @@
 Select a passage to anchor a comment, or use the block comment control. Send one
 question immediately, or save several and submit them as a batch. A follow-up
 returns an answered thread to the agent's pending queue after delivery.
+Batch confirmation opens in a centered dialog, including when the sidebar is
+hidden. A failed request leaves the list and error visible so you can retry.
 
 ## Agent loop
 
@@ -60,6 +62,10 @@ export RB_AGENT_HARNESS="your-harness"
 export RB_AGENT_NAME="your-agent-label"
 ```
 
+In PowerShell, set the equivalent `$env:RB_AGENT_SESSION`,
+`$env:RB_AGENT_HARNESS` and `$env:RB_AGENT_NAME` variables. Use your actual session
+identifier; the demo's seeded identity is fictional.
+
 Without the explicit session override, native `CODEX_THREAD_ID` or
 `CLAUDE_CODE_SESSION_ID` is used if present. Otherwise the harness is unknown and
 no native session is claimed. No model is inferred from the harness name.
@@ -89,6 +95,8 @@ required for the demo. The default service uses port 8798, so stop a foreground
 instance first. Custom port/data environment variables need to be configured in
 your service manager, not just the installation shell.
 
-For another machine, run an independent board there and use an SSH local forward.
-The optional `tunnel.sh` helper supports launchd on macOS. It does not copy
-documents or unify their write paths.
+On Windows, use the [native Windows installer](WINDOWS.md). The same `RB_DATA_DIR`
+must be selected for the service and CLI. Cross-machine access and forwarding
+are outside the public package's scope. The old peer API and tunnel helper are
+removed; existing peer files are ignored. If you previously installed a tunnel
+service, stop/remove that service yourself; updating source does not change it.

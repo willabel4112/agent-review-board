@@ -166,11 +166,20 @@ main.side-off .block.hasb { padding-right: 40px; }
 .card.k-reject { border-left-color: var(--open); }
 .donefold summary { color: var(--muted); font-size: 12.5px; cursor: pointer; padding: 2px 0; }
 .amod { color: var(--chg); font-weight: 600; }
-#stage { border: 1px solid var(--accent); border-radius: 10px; padding: 10px 12px;
-         background: var(--panel); }
-.sthead { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
-.sitem { font-size: 14px; padding: 3px 0; border-top: 1px dashed var(--line);
-         overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#stage { border: 1px solid var(--accent); border-radius: 14px; padding: 20px;
+         background: var(--panel); color: var(--fg); margin: auto;
+         width: min(600px, calc(100vw - 32px)); max-height: calc(100dvh - 32px);
+         overflow: hidden; box-shadow: 0 16px 64px rgba(0,0,0,.3); }
+#stage[open] { display: flex; flex-direction: column; gap: 14px; }
+#stage::backdrop { background: rgba(0,0,0,.42); }
+#stage h2 { margin: 0; font-size: 20px; }
+#stageHelp { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+.stage-items { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+#stage > header, #stage .crow, #stageError { flex: none; }
+#stage .crow { justify-content: flex-end; margin: 0; }
+#stageError { margin: 0; color: var(--open); font-size: 14px; overflow-wrap: anywhere; }
+.sitem { font-size: 15px; padding: 10px 0; border-top: 1px dashed var(--line);
+         overflow-wrap: anywhere; }
 
 /* ---------- v2: 划词高亮 + 浮动评论按钮 ---------- */
 mark.selmark { background: var(--open-bg); color: inherit; border-radius: 3px;
@@ -338,10 +347,8 @@ button.tiny.solid { background: var(--accent); color: #fff; }
 .block.unseen:hover::after { content: "Unread"; position: absolute; left: 4px; bottom: 2px;
                              font-size: 10px; color: var(--draft); }
 
-/* ---------- v2.3 F1 / B1: 首页 peers 分节 · 死条目灰显 ---------- */
+/* ---------- Missing local documents ---------- */
 .doccard.dead { opacity: .45; }
-.peer h3 { margin: 22px 0 6px; font-size: 15px; color: var(--muted); border-bottom: 1px solid var(--line); }
-.peer .hint { font-size: 13px; }
 
 /* ---------- v2.4 F14: 搜索 ---------- */
 /* v2.5 F16: 搜索悬浮不置顶 — fixed 卡片, 不推挤正文 */

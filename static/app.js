@@ -1298,40 +1298,62 @@ $("viewDiff").onclick = () => setView("diff");
 
 /* ---------- 提交批次 (staging 含追问草稿) ---------- */
 
-$("submitBtn").onclick = async () => {
+$("submitBtn").onclick = () => {
   const ds = THREADS.filter(t => t.status === "draft" && t.kind !== "note");
   const fds = [];
   for (const t of THREADS)
     for (const u of (t.turns || []))
       if (u.kind === "followup" && u.draft) fds.push({ t, u });
   const stage = $("stage");
-  if (stage.hidden) {                       // 一段 staging: 先看清这批要发什么
-    stage.hidden = false;
-    stage.innerHTML = `<div class="sthead">Submit ${ds.length + fds.length} item(s)? Sent items cannot be edited or withdrawn:</div>` +
+  if (!ds.length && !fds.length) return;
+  const count = ds.length + fds.length;
+  const items = `${count} ${count === 1 ? "item" : "items"}`;
+  if (!stage.open) {                        // Keep confirmation visible regardless of sidebar or scroll position.
+    stage.innerHTML = `<header><h2 id="stageTitle">Submit ${items}?</h2>` +
+      `<p id="stageHelp">These items will be delivered to your agent. Submitted items cannot be edited or withdrawn.</p></header><div class="stage-items">` +
       ds.map(t => `<div class="sitem"><b>#${t.id.slice(2)}</b> ${esc(oneLine(t))}</div>`).join("") +
-      fds.map(({ t, u }) => `<div class="sitem"><b>#${t.id.slice(2)}↳</b> ${esc((u.text || "").split("\n")[0].slice(0, 90))}</div>`).join("");
+      fds.map(({ t, u }) => `<div class="sitem"><b>#${t.id.slice(2)}↳</b> ${esc((u.text || "").split("\n")[0].slice(0, 90))}</div>`).join("") +
+      `</div><p id="stageError" role="alert" hidden></p>`;
     const row = document.createElement("div");
     row.className = "crow";
     const ok = document.createElement("button");
-    ok.textContent = "Confirm submission";
+    const label = `Submit ${items}`;
+    ok.textContent = label;
     ok.onclick = async () => {
-      const r = await api("/api/submit", { doc: docid });
-      if (r.ok) {
+      if (ok.disabled) return;
+      const error = $("stageError");
+      error.hidden = true;
+      ok.disabled = no.disabled = true;
+      ok.textContent = "Submitting…";
+      stage.setAttribute("aria-busy", "true");
+      try {
+        const r = await api("/api/submit", { doc: docid });
+        if (!r.ok) throw new Error(r.err || "The server did not confirm submission. Please retry.");
         const parts = [];
-        if (r.batch) parts.push(`batch ${r.batch} (${r.ids.length} comments)`);
-        if (r.fids && r.fids.length) parts.push(`${r.fids.length} follow-ups`);
-        toast(`Submitted ${parts.join(" + ")} · delivered to the agent queue`);
+        if (r.batch) parts.push(`batch ${r.batch} (${r.ids.length} ${r.ids.length === 1 ? "item" : "items"})`);
+        if (r.fids && r.fids.length) parts.push(`${r.fids.length} ${r.fids.length === 1 ? "follow-up" : "follow-ups"}`);
+        toast(`Submitted ${parts.join(" + ")} — delivered to the agent`);
+        stage.close();
+      } catch (e) {
+        error.textContent = `Submission incomplete: ${e.message || "Connection failed. Please retry."}`;
+        error.hidden = false;
+      } finally {
+        ok.disabled = no.disabled = false;
+        ok.textContent = label;
+        stage.removeAttribute("aria-busy");
       }
-      stage.hidden = true;
-      refresh(true);
+      if (!stage.open) refresh(true).catch(() => toast("Submitted successfully. Refresh the page to see the result."));
     };
     const no = document.createElement("button");
     no.className = "ghost";
-    no.textContent = "Keep editing";
-    no.onclick = () => { stage.hidden = true; };
+    no.textContent = "Cancel";
+    no.autofocus = true;
+    no.onclick = () => stage.close();
+    stage.oncancel = e => { if (ok.disabled) e.preventDefault(); };
     row.appendChild(ok); row.appendChild(no);
     stage.appendChild(row);
-  } else stage.hidden = true;
+    stage.showModal();
+  }
 };
 
 /* ---------- data loop ---------- */

@@ -56,7 +56,6 @@
   <article id="doc"></article>
   <div id="sideDrag" title="Drag to resize · double-click to reset"></div>
   <aside id="side">
-    <div id="stage" hidden></div>
     <div id="tray" hidden>
       <h3>⚠ Unanchored <span class="hint">(the original block is missing; expand the comment to inspect it)</span></h3>
       <div id="traylist"></div>
@@ -68,6 +67,7 @@
     <div id="threads"></div>
   </aside>
 </main>
+<dialog id="stage" aria-labelledby="stageTitle" aria-describedby="stageHelp"></dialog>
 <div id="composer" hidden>
   <div id="cquote"></div>
   <textarea id="ctext" placeholder="Comment… (⌘/Ctrl+Enter saves a draft)"></textarea>

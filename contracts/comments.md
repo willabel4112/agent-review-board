@@ -220,15 +220,10 @@ rev_before, 除非他之后又即发了评论 — 那基线前移到那条, 语�
   心跳 Ns 前」; 无 → 「无人值守」。
 - `reply` / `answer` 事件的 `session` (已有) 在 fold 输出到 turn (`turn.session`); public package uses short native session IDs for labels; it does not read private harness registries.
 
-### 联合首页 (F1; 机器本地 `peers.local.json`, gitignored)
+### Public local-only scope
 
-```json
-[{"name":"remote-workstation","url":"http://127.0.0.1:8799"}]
-```
-
-`/api/peers` = 逐 peer 抓 `<url>/api/docs` (超时 1 s), 回 `{name,url,ok,err?,docs}`; 首页每 peer 一节,
-链接直指 peer url。不做鉴权、不做代理、不同步状态 (08-14 裁决不变)。隧道常驻 = `launchd/
-io.github.willabel4112.review-board-tunnel.plist` 模板 (`ssh -N -L`), `./tunnel.sh <host> <localport> [name]`。
+The peer API, peer homepage and SSH tunnel helper are removed in 0.2.0.
+An existing `peers.local.json` is ignored. Registry and claims remain local.
 
 ### registry
 
@@ -318,7 +313,7 @@ io.github.willabel4112.review-board-tunnel.plist` 模板 (`ssh -N -L`), `./tunne
 
 ## Public package identity and state
 
-`RB_DATA_DIR` isolates registry, claims, peers and snapshots. Sidecars remain next to
+`RB_DATA_DIR` isolates registry, claims and snapshots. Sidecars remain next to
 their documents. Explicit `RB_AGENT_SESSION` / `RB_AGENT_HARNESS` / `RB_AGENT_NAME`
 take precedence over native session environment variables. Native Codex and Claude
 Code sessions remain distinct; model identity is not inferred. Reply and answer

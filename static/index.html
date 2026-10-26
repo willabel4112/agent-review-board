@@ -13,7 +13,6 @@
   <div id="gswrap"><input id="gsq" placeholder="🔍 Search all boards… (2+ characters; includes archives)">
   <div id="gsres"></div></div>
   <div id="doclist">Loading…</div>
-  <div id="peers"></div>
   <p class="hint">Register a document: <code>python3 boardctl.py register &lt;path.md&gt;</code>
      · See the README for the agent workflow</p>
 </main>
@@ -21,10 +20,10 @@
 const LBL = {open:"Pending", draft:"⚠ Drafts", answered:"Answered", resolved:"Resolved"};
 const RLBL = {open:"", answered:"⏳ Awaiting approval", approved:"✓ Approved", rejected:"Changes requested · waiting for agent"};
 const esc = (x) => String(x).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
-function mk(doc, sat, base) {
+function mk(doc, sat) {
   const a = document.createElement("a");
   a.className = "doccard" + (sat ? " satcard" : "") + (doc.exists ? "" : " dead");
-  a.href = (base || "") + "/d/" + encodeURIComponent(doc.id);
+  a.href = "/d/" + encodeURIComponent(doc.id);
   const counts = Object.entries(doc.counts || {}).filter(([s]) => s !== "draft" || true);
   const chips = counts.map(([s,n])=>`<span class="chip s-${s}">${LBL[s]||s} ${n}</span>`).join(" ");
   const r = doc.round, rl = r ? RLBL[r.status] : "";
@@ -41,7 +40,7 @@ function mk(doc, sat, base) {
     <div class="dcpath">${esc(doc.path)}</div>${q}<div>${dr}${born}${cl}${cv}${rc}${chips||(rc||born?"":'<span class="hint">No comments</span>')}</div>`;
   return a;
 }
-function renderDocs(box, docs, base) {
+function renderDocs(box, docs) {
   // 母卡下挂卫星 (registry parent — 板侧元数据); 母不在注册表的卫星按顶层显示
   const live = docs.filter(x=>!x.archived), dead = docs.filter(x=>x.archived);
   const kids = {};
@@ -50,18 +49,18 @@ function renderDocs(box, docs, base) {
       (kids[doc.parent] = kids[doc.parent]||[]).push(doc);
   for (const doc of live) {
     if (doc.parent && live.some(x=>x.id===doc.parent)) continue;
-    box.appendChild(mk(doc, false, base));
+    box.appendChild(mk(doc, false));
     const ks = kids[doc.id]||[];
     if (ks.length) {                       // v2.4 F12: 卫星默认折进母行
       const det = mkDetails("sats", "sat:"+doc.id, `↳ Child documents ${ks.length}`);
-      for (const k of ks) det.appendChild(mk(k, true, base));
+      for (const k of ks) det.appendChild(mk(k, true));
       box.appendChild(det);
     }
   }
   if (dead.length) {
     const det = document.createElement("details");
     det.innerHTML = `<summary class="hint">🗄 Archived: ${dead.length}</summary>`;
-    for (const doc of dead) det.appendChild(mk(doc, false, base));
+    for (const doc of dead) det.appendChild(mk(doc, false));
     box.appendChild(det);
   }
 }
@@ -83,25 +82,8 @@ fetch("/api/docs").then(r=>r.json()).then(d=>{
   box.innerHTML = "";
   if (!d.docs.length) { box.textContent = "No documents registered yet."; return; }
   const det = mkDetails("msec", "local", `Local · ${d.host||""} (${d.docs.filter(x=>!x.archived).length})`);
-  renderDocs(det, d.docs, "");
+  renderDocs(det, d.docs);
   box.appendChild(det);
-});
-// v2.3 F1 联合首页: 别的机器的板并排列出 (状态不搬家, 链接直指 peer 端口 = 你的 ssh -L)
-fetch("/api/peers").then(r=>r.json()).then(d=>{
-  const box = document.getElementById("peers");
-  for (const peer of (d.peers || [])) {
-    const sec = mkDetails("msec peer", "peer:"+peer.name,
-      `${peer.name} board (${peer.ok?peer.docs.filter(x=>!x.archived).length:"Disconnected"})`);
-    if (!peer.ok) {
-      const h = document.createElement("div");
-      h.className = "hint";
-      h.innerHTML = `Disconnected: ${esc(peer.err||"")} — check the SSH tunnel. <code>./tunnel.sh &lt;ssh-host&gt; ${esc(peer.url.split(":").pop())} ${esc(peer.name)}</code>`;
-      sec.appendChild(h);
-    } else if (!peer.docs.length) {
-      const h = document.createElement("div"); h.className="hint"; h.textContent="No documents registered on that host"; sec.appendChild(h);
-    } else renderDocs(sec, peer.docs, peer.url);
-    box.appendChild(sec);
-  }
 });
 const gsq=document.getElementById("gsq"), gres=document.getElementById("gsres");
 let gt=null;

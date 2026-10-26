@@ -16,12 +16,11 @@ def seed(root):
     lib.REGISTRY = str(root / 'registry.local.json')
     lib._LEGACY_REGISTRY = str(root / 'no-legacy.json')
     lib.CLAIMS = str(root / 'claims.local.json')
-    lib.PEERS = str(root / 'peers.local.json')
     lib.SNAPDIR = str(root / '.snapshots')
     os.environ['RB_HOST'] = 'demo'
     doc = root / 'research-plan.md'
     child = root / 'sampling.md'
-    current = Path(__file__).with_name('research-plan.md').read_text()
+    current = Path(__file__).with_name('research-plan.md').read_text(encoding="utf-8")
     old = current.replace(
         'The evaluation includes exact-name lookups, paraphrased questions, ambiguous\n'
         'queries, and questions whose answer is absent. Report each group separately.\n'
@@ -29,8 +28,8 @@ def seed(root):
         'The evaluation includes exact-name lookups and paraphrased questions.\n'
         'Report a single average score. Keep the source snippets so the human can\n'
         'inspect why a result was judged useful.')
-    doc.write_text(old)
-    child.write_text(Path(__file__).with_name('sampling.md').read_text())
+    doc.write_text(old, encoding="utf-8", newline="\n")
+    child.write_text(Path(__file__).with_name('sampling.md').read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
     lib.save_registry({
         'research': {'path': str(doc), 'title': 'Choosing a local search tool',
                      'question': 'Can a review turn a plausible plan into a better decision?', 'emoji': '🔎'},
@@ -53,7 +52,7 @@ def seed(root):
     lib.append_event(cp, {'type': 'comment', 'id': 'c-0002', 'ts': ts+3, 'author': 'Reviewer',
                          'kind': 'block', 'anchor': anchor(sample), 'sent': True, 'intent': 'explore',
                          'text': 'How can we choose the question set before seeing the results?'})
-    doc.write_text(current)
+    doc.write_text(current, encoding="utf-8", newline="\n")
     lib.append_event(rp, {'type': 'rev', 'sha': after, 'ts': ts+10, 'by': 'agent'})
     lib.append_event(rp, {'type': 'answer', 're': 'c-0001', 'ts': ts+11, 'mode': 'edit', 'rev': after,
                          'summary': 'Added ambiguous and absent-answer cases; the plan now reports each group separately.'})

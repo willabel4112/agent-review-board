@@ -11,9 +11,7 @@ import re
 import posixpath
 import time
 import threading
-import urllib.error
 import urllib.parse
-import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import board_lib as lib
@@ -57,6 +55,23 @@ def _stats(docid, a, b):
     return out
 
 
+def _resource_path(base, relative):
+    """Jail URL resource paths on POSIX and Windows (including drives/ADS)."""
+    relative = urllib.parse.unquote(relative)
+    if ("\\" in relative or ":" in relative or "\x00" in relative
+            or relative.startswith("/") or ".." in relative.split("/")):
+        return None
+    root = os.path.realpath(base)
+    target = os.path.realpath(os.path.join(root, relative))
+    try:
+        if os.path.normcase(os.path.commonpath([root, target])) != os.path.normcase(root):
+            return None
+    except ValueError:
+        return None
+    return target
+
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         pass
@@ -95,7 +110,9 @@ class Handler(BaseHTTPRequestHandler):
             fn = posixpath.normpath(path[len("/static/"):])
             if fn.startswith("..") or fn.startswith("/"):
                 return self._send(400, {"err": "bad path"})
-            full = os.path.join(STATIC, fn)
+            full = _resource_path(STATIC, fn)
+            if full is None:
+                return self._send(400, {"err": "bad path"})
             if not os.path.isfile(full):
                 return self._send(404, {"err": "not found"})
             ctype = ("application/javascript" if fn.endswith(".js")
@@ -108,16 +125,14 @@ class Handler(BaseHTTPRequestHandler):
             return self._answerdoc(path[len("/api/answerdoc/"):])
         if path == "/api/docs":
             return self._docs()
-        if path == "/api/peers":
-            return self._peers()
         if path == "/api/search":
             return self._search()
         if path == "/favicon.svg" or path == "/favicon.ico":
             return self._favicon()
         if path.startswith("/api/doc/"):
-            return self._doc(path[len("/api/doc/"):])
+            return self._doc(urllib.parse.unquote(path[len("/api/doc/"):]))
         if path.startswith("/api/threads/"):
-            return self._threads(path[len("/api/threads/"):])
+            return self._threads(urllib.parse.unquote(path[len("/api/threads/"):]))
         if path.startswith("/api/explore/"):
             docid = urllib.parse.unquote(path[len("/api/explore/"):])
             reg = lib.load_registry()
@@ -125,11 +140,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(404, {"err": "doc"})
             return self._send(200, lib.exploration_family(reg, docid))
         if path.startswith("/api/revs/"):
-            return self._revs(path[len("/api/revs/"):])
+            return self._revs(urllib.parse.unquote(path[len("/api/revs/"):]))
         if path.startswith("/api/rounds/"):
-            return self._rounds(path[len("/api/rounds/"):])
+            return self._rounds(urllib.parse.unquote(path[len("/api/rounds/"):]))
         if path.startswith("/api/diff/"):
-            return self._diff(path[len("/api/diff/"):])
+            return self._diff(urllib.parse.unquote(path[len("/api/diff/"):]))
         return self._send(404, {"err": "route"})
 
     def _doc_path(self, docid):
@@ -139,12 +154,13 @@ class Handler(BaseHTTPRequestHandler):
     def _asset(self, rest):
         """doc 目录内相对资源; realpath 越界拒绝."""
         docid, _, rel = rest.partition("/")
+        docid = urllib.parse.unquote(docid)
         reg = lib.load_registry()
         if docid not in reg:
             return self._send(404, {"err": "doc"})
         base = os.path.dirname(os.path.realpath(reg[docid]["path"]))
-        full = os.path.realpath(os.path.join(base, rel))
-        if full != base and not full.startswith(base + os.sep):
+        full = _resource_path(base, rel)
+        if full is None:
             return self._send(403, {"err": "traversal"})
         if not os.path.isfile(full):
             return self._send(404, {"err": "not found"})
@@ -155,15 +171,15 @@ class Handler(BaseHTTPRequestHandler):
         """外链答案只读渲染源 (契约 v2): doc 目录内 .md, jail 同 _asset;
         无 sidecar / 无装饰 / **不落快照**."""
         docid, _, rel = rest.partition("/")
-        rel = urllib.parse.unquote(rel)
+        docid = urllib.parse.unquote(docid)
         reg = lib.load_registry()
         if docid not in reg:
             return self._send(404, {"err": "doc"})
         if not rel.endswith(".md"):
             return self._send(400, {"err": "Markdown only; use /api/asset for other resources"})
         base = os.path.dirname(os.path.realpath(reg[docid]["path"]))
-        full = os.path.realpath(os.path.join(base, rel))
-        if full != base and not full.startswith(base + os.sep):
+        full = _resource_path(base, rel)
+        if full is None:
             return self._send(403, {"err": "traversal"})
         md = lib.read_doc(full)
         if md is None:
@@ -254,23 +270,6 @@ class Handler(BaseHTTPRequestHandler):
         svg = ('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">'
                + "".join(parts) + "</svg>")
         return self._send(200, svg.encode("utf-8"), "image/svg+xml")
-
-    def _peers(self):
-        """v2.3 联合首页: 逐 peer 抓 /api/docs (超时 1 s), 不通就 ok=false — 状态不搬家, 只并排列."""
-        out = []
-        for peer in lib.load_peers():
-            url = peer["url"].rstrip("/")
-            item = {"name": peer.get("name") or url, "url": url, "ok": False, "docs": []}
-            try:
-                with urllib.request.urlopen(url + "/api/docs", timeout=1.0) as r:
-                    j = json.loads(r.read().decode("utf-8"))
-                item["docs"] = j.get("docs") or []
-                item["host"] = j.get("host")
-                item["ok"] = True
-            except (urllib.error.URLError, OSError, ValueError) as e:
-                item["err"] = str(getattr(e, "reason", e))[:120]
-            out.append(item)
-        return self._send(200, {"peers": out})
 
     def _doc(self, docid):
         reg = lib.load_registry()
@@ -673,7 +672,10 @@ class Handler(BaseHTTPRequestHandler):
 def main():
     srv = ThreadingHTTPServer(("127.0.0.1", PORT), Handler)
     print("review-board on http://127.0.0.1:%d" % PORT, flush=True)
-    srv.serve_forever()
+    try:
+        srv.serve_forever()
+    finally:
+        srv.server_close()
 
 
 if __name__ == "__main__":

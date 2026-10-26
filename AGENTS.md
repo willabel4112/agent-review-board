@@ -3,6 +3,10 @@
 Read README.md and ARCHITECTURE.md before changing the implementation. Update
 contracts/comments.md before changing an event consumed by the server, CLI and UI.
 Run the Python tests and the navigation JavaScript tests after relevant changes.
+For platform changes, run `tests/test_platform.py` on native Windows as well;
+POSIX emulation does not verify Windows support. Use synthetic documents and
+isolated `RB_DATA_DIR` state. The public package is local-only; do not add private
+machine inventories, remote PIN/auth setup, peer directories or SSH forwarding.
 
 For document review:
 
